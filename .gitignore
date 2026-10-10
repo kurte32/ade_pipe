@@ -25,3 +25,4 @@ e2e/test-results/
 e2e/playwright-report/
 tools/dev-idp/*.pem
 docs/openapi.json.tmp
+*.tsbuildinfo
