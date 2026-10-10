@@ -30,14 +30,22 @@ What is solid, and independently verified:
 - **The tests are load-bearing.** The 125 backend tests run against real dependencies and would fail
   if their controls were removed; the 20 frontend unit tests and 14 Playwright end-to-end tests pass.
 
+> **Remediation in the same session:** the Critical finding and both High findings were fixed and
+> verified from a clean state (B-01, D-01, E-1), along with several Mediums (A1, A2, B-03, C6) and
+> the quick deploy-path statics (D-02, D-05, D-08). See `REMEDIATION_PLAN.md` for the status table
+> and verification protocol. The findings below describe the defects as found; each now carries its
+> remediation status. The production-readiness verdict still stands, for the reasons in its section.
+
 ## Major findings
 
-1. **Critical — silent lost update (B-01).** Optimistic concurrency is checked in Python before the
-   UPDATE rather than in the UPDATE itself, so concurrent writes carrying the same ETag all succeed.
-   Reproduced twice: ten simultaneous transitions with one ETag all returned success and wrote ten
-   duplicate rows into the append-only audit ledger. Two devices, a retried offline operation, or two
-   admin actions racing will silently overwrite each other. This is data loss reachable today and the
-   single blocker to any production claim.
+1. **Critical — silent lost update (B-01). [Fixed and verified.]** Optimistic concurrency was checked
+   in Python before the UPDATE rather than in the UPDATE itself, so concurrent writes carrying the
+   same ETag all succeeded. Reproduced twice: ten simultaneous transitions with one ETag all returned
+   success and wrote ten duplicate rows into the append-only audit ledger. Two devices, a retried
+   offline operation, or two admin actions racing would silently overwrite each other. The fix
+   enforces the rowversion in the UPDATE (SQLAlchemy `version_id_col`); the burst now returns one
+   success and the rest 412, and a deterministic regression test guards it. The admin return, discard,
+   and reassign routes were confirmed to update the site row through the same mapper.
 2. **High — a clean clone cannot be set up (D-01).** The `.env.example` the documentation tells every
    user to copy is not tracked by git, so a fresh clone fails at the first step and the CI backend job
    cannot load its environment. The “verified from a clean clone” claim does not hold.
@@ -58,14 +66,15 @@ What is solid, and independently verified:
 
 ## Production-readiness verdict
 
-**Not production-ready.** The gating item is B-01, which must be fixed and verified before any
-production claim. Independently, nothing has been validated in Azure — Entra sign-in, Graph, Teams,
-Defender, immutability, Private Link, and the whole deploy pipeline are written and at most statically
-validated — and the deploy path itself (D-02 to D-06) is broken on inspection. The offline promise
-(E-1) degrades under ordinary production conditions. The security posture and the local build quality
-are strong enough that, once the critical and high findings are resolved and the deploy path is
-corrected and exercised in a real test subscription, the system is a credible candidate for a staged
-production rollout.
+**Not production-ready.** The Critical finding (B-01) and both High findings (D-01, E-1) are now fixed
+and verified locally, so the original gating item is cleared. The verdict stands for two independent
+reasons. First, nothing has been validated in Azure — Entra sign-in, Graph, Teams, Defender,
+immutability, Private Link, and the whole deploy pipeline are written and at most statically validated.
+Second, the deploy path is only partly corrected: D-02, D-05, and D-08 are fixed on inspection, but
+D-03 (migration ordering), D-04 (build-once promotion), and D-06 (no CI gate) remain open and each
+prevents a correct dev→test→prod deployment. The security posture and the local build quality are
+strong. Once the remaining deploy-path items are done and the pipeline is exercised in a real test
+subscription, the system is a credible candidate for a staged production rollout.
 
 See `TECHNICAL_FINDINGS.md` for every finding with evidence, `SECURITY_ASSESSMENT.md`,
 `TEST_VALIDATION_REPORT.md`, `RISK_REGISTER.md` (prioritised), `REMEDIATION_PLAN.md`, and

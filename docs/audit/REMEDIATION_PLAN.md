@@ -120,6 +120,10 @@ verified from a clean state: `make reset && make up` (51 s, migrations applied) 
 | D-08 | Low | SCAN_MODE derived from `enableDefenderScanning` | Bicep builds; statically validated |
 | D-10, D-11, B-07 | Low | Documentation corrected; TO_BE trigger claim amended | — |
 
+**Follow-up from the E-1 fix:** a transient 5xx now returns `kind: "offline"`, so the sync status can
+briefly read "sin conexión" while the device is actually online. Correct for retry, slightly
+misleading label. A distinct transient state (e.g. "reintentando") is a small follow-up, not a defect.
+
 **Left as planned actions** (design change, larger scope, or needs Azure): B-02, B-04, B-05, B-06,
 A5 + D-12, D-06, D-07, D-03, D-04, C4 (self-provisioning rewrite), C5/C7/C8/C9 test hardening, and the
 remaining E-/Info UX items. These stay in the tiers above with acceptance criteria.

@@ -6,12 +6,16 @@ unless noted.
 
 ## Automated suites (re-run during the audit)
 
+Counts are the post-remediation state, re-run from a clean reset (`make reset && make up &&
+make db-seed`): backend 131 (was 125; +1 concurrency, +4 security, +1 delta), frontend unit 21
+(was 20; +1 transient-retry), Playwright 14.
+
 | Suite | Command | Result |
 |---|---|---|
-| Backend unit + integration | `pytest -q` in the api container | 125 passed |
+| Backend unit + integration | `pytest -q` in the api container | 131 passed |
 | Backend, reversed collection order | reversed node-id order | 124 passed, 1 failed — `test_reload_updates_without_touching_progress` only (exposes C4) |
 | Backend coverage | `pytest --cov=app` | 86% (3018 statements, 409 missed); zero coverage on `cli.py`, all five `jobs/*` entry points, partial on Azure/Entra/Defender paths (C8) |
-| Frontend unit (vitest) | `pnpm -r test` | 20 passed (auth 4, api-client 3, web-admin 7, pwa 6) |
+| Frontend unit (vitest) | `pnpm -r test` | 21 passed (auth 4, api-client 3, web-admin 7, pwa 7) |
 | End-to-end (Playwright) | `playwright test --list` + run | 14 tests in 6 files, pass; Vite servers confirmed up |
 | Bicep | `bash infra/bicep/validate.sh` | 13 modules + 3 parameter files build and lint (compile-only) |
 | Dependency audit | `pnpm audit --audit-level high`, `pip-audit` | no known vulnerabilities |
@@ -31,7 +35,7 @@ run), C8 (production-only paths barely covered), and C10 (no JWT algorithm-confu
 | B-03 | `GET …/delta?conocidos=<2500 ids>` | HTTP 500; 3 ids → 200 |
 | B-04 | 100k-row xlsx (2.92 MB) through the real parser | rejected after 43.79 s, 72.9 MB peak — limit checked after full parse |
 | B-05 | 12 MB body for a 4 MB part | 422, but the whole 12 MB was received first |
-| D-01 (High) | `git ls-files --error-unmatch .env.example` | not tracked |
+| D-01 (High) | `git ls-files --error-unmatch .env.example` | not tracked (now fixed; a real `git clone` was permission-denied in this session, so `git ls-tree -r implementation` was the post-fix evidence that the file is in the committed tree) |
 | E-1 (High) | stop API, save in PWA, restart API, Sincronizar ahora | op stuck `estado="error"`; only per-site Reintentar drained it |
 | A1 | read `_production_guard` | validates issuer, not JWKS URL |
 | A5 | PUT with forged XFF + correlation id | exact values written to the immutable audit ledger |
@@ -49,7 +53,10 @@ errors on any screen:
   the missing-document requirements listed and the advance button correctly disabled until met; the
   offline queue persisting across a dev-server restart; and the per-site Reintentar recovery draining a
   queued change end to end (the contact write round-tripped with its new ETag).
-- **Offline reliability (E-1):** reproduced the transient-5xx wedge and its manual recovery, as above.
+- **Offline reliability (E-1):** reproduced the transient-5xx wedge and its manual recovery. After the
+  fix, re-ran the exact scenario in Chrome — stop API, save (op stays `pendiente`, `intentos: 1`, not a
+  terminal error), restart API, click Sincronizar ahora — and the queue drained automatically with no
+  per-site button.
 
 What real Chrome did **not** exercise, and why:
 - A completed admin **return** (Devolver): the sampled site was at the first status, where the button is

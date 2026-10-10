@@ -81,3 +81,7 @@ trigger check does not exist (B-07).
 Production-readiness gate: B-01 must be fixed and verified, and the deploy-path defects corrected and
 exercised in a real test subscription, before the register is attached to `PRODUCTION_READINESS.md`
 for go-live.
+
+**Remediation status (2026-10-10):** B-01, D-01, E-1, A1, A2, B-03 fixed and verified locally;
+D-02, D-05, D-08 fixed and statically validated; D-10, D-11, B-07 doc corrections applied. D-03, D-04,
+D-06, D-07 and the B-/A-/C- items listed above remain open. Detail in `docs/audit/REMEDIATION_PLAN.md`.

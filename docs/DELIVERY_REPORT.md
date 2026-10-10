@@ -105,10 +105,11 @@ Not covered by browser tests: MSAL sign-in (no tenant), installed PWA behavior o
 
 > **Audit correction (2026-10-10):** an independent audit found that optimistic concurrency was
 > **not** enforced at the database — the ETag/rowversion check ran in Python, so concurrent writes
-> with the same ETag all committed (finding B-01, Critical). The "optimistic concurrency" item below
-> should not be read as validated until the `version_id_col` fix in `docs/audit/REMEDIATION_PLAN.md`
-> is applied and verified. The audit also qualifies the idempotency claim (B-02: concurrent replays
-> return 500, not the stored response). See `docs/audit/`.
+> with the same ETag all committed (finding B-01, Critical). This is now **fixed and verified**: the
+> rowversion is enforced in the UPDATE (SQLAlchemy `version_id_col`), a concurrent same-ETag burst
+> returns one success and the rest 412, and a regression test guards it. The idempotency claim is
+> still qualified (B-02: concurrent replays return 500, not the stored response — open). See
+> `docs/audit/`.
 
 Validated locally with automated tests: token validation negatives, role enforcement, three-layer isolation including pooled connections and raw SQL, block predicates, least-privilege grants, append-only ledger behavior, file type by signature, PDF structure and limits, hash verification, idempotent replay, optimistic concurrency, outbox retry and dead-letter, upload session expiry, purge with retained metadata, audit on every write and download, Problem Details without stack traces, log redaction of personal data keys, production configuration guard.
 

@@ -37,7 +37,7 @@ the immutable audit ledger) and is covered in the technical findings and risk re
   the API then fetches signing keys from the attacker and would trust tokens the attacker signs.
 - Why not High: a wrong JWKS fails closed — every legitimate token 401s immediately, so the condition
   is loud — and the attacker additionally needs a reachable malicious JWKS host.
-- Mitigation status: open. Fix is to pin the JWKS host (and require https) in `_production_guard`.
+- Mitigation status: **fixed and verified** (test `test_production_guard_refuses_foreign_jwks_url`). `_production_guard` now requires `auth_jwks_url` to be the Entra keys host.
 
 ### A5 — Client-controlled headers written into the immutable audit ledger (Low)
 - Attack scenario: any authenticated coordinator sends `X-Forwarded-For` and `X-Correlation-Id` of

@@ -41,3 +41,10 @@ architecture. Urgency: **P0** = before any production claim · **P1** = before a
 | C11 | Playwright `flows` project matches nothing | Info | — | Flows never run on desktop | P3 |
 | E-5 | Site count 14 vs 13 | Info | — | Minor display off-by-one | P3 |
 | E-6 | Shared dev DB accumulates e2e rows | Info | — | See C7 | P3 |
+
+## Remediation status (2026-10-10)
+
+**Fixed and verified this session:** B-01, D-01, E-1, A1, A2, B-03, C6, C10, C11 (code + regression
+tests, clean-state verification). **Fixed statically only (no Azure):** D-02, D-05, D-08.
+**Fixed (docs):** D-10, D-11, B-07. **Still open:** D-03, D-04, D-06, D-07, B-02, B-04, B-05, B-06,
+A5/D-12, C4, C5, C7, C8, C9, and the E-/Info UX items. See `REMEDIATION_PLAN.md` for the full table.
