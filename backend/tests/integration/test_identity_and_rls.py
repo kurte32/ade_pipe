@@ -61,10 +61,17 @@ def test_admin_route_requires_admin(client, coord_a_headers, admin_headers) -> N
 
 
 def test_list_only_mine(client, coord_a_headers, coord_b_headers, admin_headers, two_sites) -> None:  # type: ignore[no-untyped-def]
-    ids_a = {s["id"] for s in client.get("/api/v1/sitios", headers=coord_a_headers).json()["items"]}
-    ids_b = {s["id"] for s in client.get("/api/v1/sitios", headers=coord_b_headers).json()["items"]}
+    ids_a = {
+        s["id"]
+        for s in client.get("/api/v1/sitios?limit=200", headers=coord_a_headers).json()["items"]
+    }
+    ids_b = {
+        s["id"]
+        for s in client.get("/api/v1/sitios?limit=200", headers=coord_b_headers).json()["items"]
+    }
     ids_admin = {
-        s["id"] for s in client.get("/api/v1/sitios", headers=admin_headers).json()["items"]
+        s["id"]
+        for s in client.get("/api/v1/sitios?limit=200", headers=admin_headers).json()["items"]
     }
     assert two_sites["a"] in ids_a and two_sites["b"] not in ids_a
     assert two_sites["b"] in ids_b and two_sites["a"] not in ids_b

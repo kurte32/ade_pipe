@@ -39,7 +39,8 @@ class Claims:
         for r in KNOWN_ROLES:
             if r in self.roles:
                 return r
-        return "Ninguno"
+        # System identities (background jobs) carry a single non-user role such as "Sistema".
+        return self.roles[0] if self.roles else "Ninguno"
 
     @property
     def is_admin(self) -> bool:

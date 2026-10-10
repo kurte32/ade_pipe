@@ -1,0 +1,56 @@
+name: drift
+
+# Nightly configuration drift detection (ADR-010): what-if per environment against the committed
+# templates and parameter files. Fails when any resource would be created, modified or deleted.
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  what-if:
+    name: What-if ${{ matrix.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, test, prod]
+    environment:
+      name: ${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve currently deployed image
+        id: image
+        run: |
+          IMAGE=$(az containerapp show -g "${{ vars.RESOURCE_GROUP }}" -n "ca-pipeline-api-${{ matrix.environment }}" \
+            --query "properties.template.containers[0].image" -o tsv)
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: What-if
+        run: |
+          az deployment group what-if -g "${{ vars.RESOURCE_GROUP }}" \
+            --template-file infra/bicep/main.bicep \
+            --parameters "infra/bicep/params/${{ matrix.environment }}.bicepparam" \
+            --parameters apiImage="${{ steps.image.outputs.image }}" \
+            --no-pretty-print -o json > /tmp/whatif.json
+          COUNT=$(jq '[.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore")] | length' /tmp/whatif.json)
+          jq -r '.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore") | "\(.changeType) \(.resourceId)"' /tmp/whatif.json
+          if [ "$COUNT" != "0" ]; then
+            echo "::error::Configuration drift detected in ${{ matrix.environment }}: $COUNT change(s)"
+            exit 1
+          fi
+          echo "No drift in ${{ matrix.environment }}"

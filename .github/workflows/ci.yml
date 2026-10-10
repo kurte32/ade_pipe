@@ -1,0 +1,163 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main, implementation]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    name: Backend lint, types, unit and integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load local development environment values
+        run: |
+          # Same values as .env.example (local development only); hosts stay localhost in CI.
+          grep -E '^[A-Z_]+=' .env.example | sed -E 's/[[:space:]]*#.*$//' >> "$GITHUB_ENV"
+
+      - name: Install Microsoft ODBC Driver 18
+        run: |
+          set -euo pipefail
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update -q
+          sudo ACCEPT_EULA=Y apt-get install -y -q msodbcsql18 unixodbc
+
+      - name: Start SQL Server 2022
+        run: |
+          docker run -d --name sqlserver -p 1433:1433 \
+            -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e "MSSQL_SA_PASSWORD=${SQL_SA_PASSWORD}" \
+            mcr.microsoft.com/mssql/server:2022-latest
+          for i in $(seq 1 60); do
+            docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${SQL_SA_PASSWORD}" -C -Q "SELECT 1" >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          echo "SQL Server did not become healthy" && docker logs sqlserver && exit 1
+
+      - name: Start Azurite
+        run: |
+          docker run -d --name azurite -p 10000:10000 mcr.microsoft.com/azure-storage/azurite:latest \
+            azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --skipApiVersionCheck
+
+      - name: Start dev identity provider
+        run: |
+          python3 -m pip install --quiet "fastapi>=0.115" "uvicorn>=0.30" "pyjwt[crypto]>=2.9"
+          cd tools/dev-idp
+          DEV_IDP_KEY_PATH=/tmp/dev-idp.pem DEV_IDP_PUBLIC_URL=http://localhost:8001 \
+          DEV_TENANT_ID="${AUTH_TENANT_ID}" DEV_API_CLIENT_ID="${AUTH_AUDIENCE}" \
+            nohup python3 -m uvicorn app:app --host 127.0.0.1 --port 8001 > /tmp/dev-idp.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://localhost:8001/healthz >/dev/null 2>&1 && exit 0; sleep 1; done
+          cat /tmp/dev-idp.log && exit 1
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Lint and type-check
+        working-directory: backend
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy app
+
+      - name: Dependency vulnerability audit (pip-audit)
+        working-directory: backend
+        run: |
+          uv export --frozen --no-dev --format requirements-txt --no-hashes > /tmp/requirements.txt
+          uvx pip-audit -r /tmp/requirements.txt --strict
+
+      - name: Initialize database and apply migrations
+        working-directory: backend
+        run: |
+          uv run python -m app.cli db-init
+          uv run alembic upgrade head
+
+      - name: Unit and integration tests
+        working-directory: backend
+        run: uv run pytest -q -p no:cacheprovider --junitxml=/tmp/pytest.xml
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-report
+          path: /tmp/pytest.xml
+
+  frontend:
+    name: Frontend lint, types, build, audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.11.2 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Type-check
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Dependency vulnerability audit
+        run: pnpm audit --audit-level high
+      - name: Upload SPA bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: spa-bundles
+          path: |
+            apps/pwa-coordinador/dist
+            apps/web-admin/dist
+          if-no-files-found: error
+
+  secrets-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  bicep:
+    name: Bicep build and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bicep CLI
+        run: |
+          curl -fsSL https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64 -o /usr/local/bin/bicep
+          chmod +x /usr/local/bin/bicep
+      - name: Validate templates and parameter files
+        run: bash infra/bicep/validate.sh

@@ -1,0 +1,3789 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Pipeline de Posibles Tiendas API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_v1_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sitios": {
+      "get": {
+        "tags": [
+          "sitios"
+        ],
+        "summary": "List Sitios",
+        "operationId": "list_sitios_api_v1_sitios_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 200,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "estatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estatus"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "region",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Region"
+            }
+          },
+          {
+            "name": "incluir_no_vigentes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Incluir No Vigentes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitioPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sitios/delta": {
+      "get": {
+        "tags": [
+          "sitios"
+        ],
+        "summary": "Delta",
+        "operationId": "delta_api_v1_sitios_delta_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 16
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "name": "conocidos",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ids conocidos por el cliente, separados por coma",
+              "title": "Conocidos"
+            },
+            "description": "ids conocidos por el cliente, separados por coma"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitioDelta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sitios/resumen": {
+      "get": {
+        "tags": [
+          "sitios"
+        ],
+        "summary": "Resumen",
+        "operationId": "resumen_api_v1_sitios_resumen_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Resumen Api V1 Sitios Resumen Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sitios/{sitio_id}": {
+      "get": {
+        "tags": [
+          "sitios"
+        ],
+        "summary": "Get Sitio",
+        "operationId": "get_sitio_api_v1_sitios__sitio_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitioDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sitios/{sitio_id}/contacto": {
+      "put": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Put Contacto",
+        "operationId": "put_contacto_api_v1_sitios__sitio_id__contacto_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactoIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactoResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sitios/{sitio_id}/visita": {
+      "put": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Put Visita",
+        "operationId": "put_visita_api_v1_sitios__sitio_id__visita_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitaIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sitios/{sitio_id}/transiciones": {
+      "post": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Post Transicion",
+        "operationId": "post_transicion_api_v1_sitios__sitio_id__transiciones_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransicionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitioDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sitios/{sitio_id}/historial": {
+      "get": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Get Historial",
+        "operationId": "get_historial_api_v1_sitios__sitio_id__historial_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistorialItem"
+                  },
+                  "title": "Response Get Historial Api V1 Sitios  Sitio Id  Historial Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalogos": {
+      "get": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Get Catalogos",
+        "operationId": "get_catalogos_api_v1_catalogos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalogos"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/sitios/{sitio_id}/devolver": {
+      "post": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Post Devolver",
+        "operationId": "post_devolver_api_v1_admin_sitios__sitio_id__devolver_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevolverIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitioDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sitios/{sitio_id}/descartar": {
+      "post": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Post Descartar",
+        "operationId": "post_descartar_api_v1_admin_sitios__sitio_id__descartar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DescartarIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitioDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sitios/{sitio_id}/reasignar": {
+      "post": {
+        "tags": [
+          "transiciones"
+        ],
+        "summary": "Post Reasignar",
+        "operationId": "post_reasignar_api_v1_admin_sitios__sitio_id__reasignar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sitio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sitio Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasignarIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitioDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/cargas": {
+      "post": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Crear Carga",
+        "operationId": "crear_carga_api_v1_admin_cargas_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_crear_carga_api_v1_admin_cargas_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Listar Cargas",
+        "operationId": "listar_cargas_api_v1_admin_cargas_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LoteSummary"
+                  },
+                  "title": "Response Listar Cargas Api V1 Admin Cargas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/cargas/{lote_id}": {
+      "get": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Detalle Carga",
+        "operationId": "detalle_carga_api_v1_admin_cargas__lote_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lote_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lote Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "resultado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(ok|advertencia|error)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Resultado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/cargas/{lote_id}/decisiones": {
+      "post": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Decidir",
+        "operationId": "decidir_api_v1_admin_cargas__lote_id__decisiones_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lote_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lote Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DecisionIn"
+                },
+                "title": "Decisions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/cargas/{lote_id}/confirmar": {
+      "post": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Confirmar",
+        "operationId": "confirmar_api_v1_admin_cargas__lote_id__confirmar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lote_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lote Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfirmResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/cargas/{lote_id}/cancelar": {
+      "post": {
+        "tags": [
+          "cargas"
+        ],
+        "summary": "Cancelar",
+        "operationId": "cancelar_api_v1_admin_cargas__lote_id__cancelar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lote_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Lote Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subidas": {
+      "post": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Crear Subida",
+        "operationId": "crear_subida_api_v1_subidas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubidaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubidaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/subidas/{subida_id}": {
+      "get": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Ver Subida",
+        "operationId": "ver_subida_api_v1_subidas__subida_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subida_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subida Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubidaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Cancelar Subida",
+        "operationId": "cancelar_subida_api_v1_subidas__subida_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subida_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subida Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subidas/{subida_id}/partes/{n}": {
+      "put": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Subir Parte",
+        "operationId": "subir_parte_api_v1_subidas__subida_id__partes__n__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subida_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subida Id"
+            }
+          },
+          {
+            "name": "n",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "N"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subidas/{subida_id}/completar": {
+      "post": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Completar Subida",
+        "operationId": "completar_subida_api_v1_subidas__subida_id__completar_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subida_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Subida Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ArchivoMeta"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CompletarEscaneando"
+                    }
+                  ],
+                  "title": "Response Completar Subida Api V1 Subidas  Subida Id  Completar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/archivos/{archivo_id}/meta": {
+      "get": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Archivo Meta",
+        "operationId": "archivo_meta_api_v1_archivos__archivo_id__meta_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "archivo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Archivo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivoMeta"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/archivos/{archivo_id}": {
+      "get": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Descargar Archivo",
+        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "archivo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Archivo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Retirar Archivo",
+        "operationId": "retirar_archivo_api_v1_archivos__archivo_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "archivo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Archivo Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notificaciones": {
+      "get": {
+        "tags": [
+          "notificaciones"
+        ],
+        "summary": "List Notificaciones",
+        "operationId": "list_notificaciones_api_v1_notificaciones_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificacionList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/notificaciones/{notificacion_id}/leer": {
+      "post": {
+        "tags": [
+          "notificaciones"
+        ],
+        "summary": "Leer",
+        "operationId": "leer_api_v1_notificaciones__notificacion_id__leer_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notificacion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Notificacion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificacionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/auditoria": {
+      "get": {
+        "tags": [
+          "auditoria"
+        ],
+        "summary": "List Auditoria",
+        "operationId": "list_auditoria_api_v1_admin_auditoria_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usuario_oid",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Usuario Oid"
+            }
+          },
+          {
+            "name": "entidad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entidad"
+            }
+          },
+          {
+            "name": "entidad_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entidad Id"
+            }
+          },
+          {
+            "name": "accion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accion"
+            }
+          },
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriaPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/equivalencias": {
+      "get": {
+        "tags": [
+          "equivalencias"
+        ],
+        "summary": "List Equivalencias",
+        "operationId": "list_equivalencias_api_v1_admin_equivalencias_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EquivalenciaOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Equivalencias Api V1 Admin Equivalencias Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "equivalencias"
+        ],
+        "summary": "Upsert Equivalencias",
+        "operationId": "upsert_equivalencias_api_v1_admin_equivalencias_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/EquivalenciaIn"
+                },
+                "type": "array",
+                "title": "Items"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EquivalenciaOut"
+                  },
+                  "type": "array",
+                  "title": "Response Upsert Equivalencias Api V1 Admin Equivalencias Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/equivalencias/{codigo}": {
+      "put": {
+        "tags": [
+          "equivalencias"
+        ],
+        "summary": "Upsert Equivalencia",
+        "operationId": "upsert_equivalencia_api_v1_admin_equivalencias__codigo__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z]{3,10}$",
+              "title": "Codigo"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EquivalenciaBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquivalenciaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ArchivoMeta": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "sitio_id": {
+            "type": "integer",
+            "title": "Sitio Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "tipo_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
+          },
+          "nombre_original": {
+            "type": "string",
+            "title": "Nombre Original"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "paginas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paginas"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "subido_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Subido Utc"
+          },
+          "purga_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purga Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sitio_id",
+          "tipo",
+          "nombre_original",
+          "content_type",
+          "sha256",
+          "bytes",
+          "version",
+          "vigente",
+          "estado",
+          "subido_utc"
+        ],
+        "title": "ArchivoMeta"
+      },
+      "ArchivoOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "tipo_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
+          },
+          "nombre_original": {
+            "type": "string",
+            "title": "Nombre Original"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "paginas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paginas"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "subido_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Subido Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tipo",
+          "nombre_original",
+          "content_type",
+          "bytes",
+          "version",
+          "vigente",
+          "estado",
+          "subido_utc"
+        ],
+        "title": "ArchivoOut"
+      },
+      "AuditoriaItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "fecha_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Utc"
+          },
+          "usuario_oid": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Usuario Oid"
+          },
+          "rol": {
+            "type": "string",
+            "title": "Rol"
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion"
+          },
+          "entidad": {
+            "type": "string",
+            "title": "Entidad"
+          },
+          "entidad_id": {
+            "type": "string",
+            "title": "Entidad Id"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fecha_utc",
+          "usuario_oid",
+          "rol",
+          "accion",
+          "entidad",
+          "entidad_id",
+          "correlation_id",
+          "detalle"
+        ],
+        "title": "AuditoriaItem"
+      },
+      "AuditoriaPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditoriaItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "AuditoriaPage"
+      },
+      "Body_crear_carga_api_v1_admin_cargas_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_crear_carga_api_v1_admin_cargas_post"
+      },
+      "Catalogos": {
+        "properties": {
+          "estatus": {
+            "items": {
+              "$ref": "#/components/schemas/EstatusItem"
+            },
+            "type": "array",
+            "title": "Estatus"
+          },
+          "motivos_devolucion": {
+            "items": {
+              "$ref": "#/components/schemas/MotivoItem"
+            },
+            "type": "array",
+            "title": "Motivos Devolucion"
+          },
+          "tipos_documento": {
+            "items": {
+              "$ref": "#/components/schemas/TipoDocumentoItem"
+            },
+            "type": "array",
+            "title": "Tipos Documento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estatus",
+          "motivos_devolucion",
+          "tipos_documento"
+        ],
+        "title": "Catalogos"
+      },
+      "CompletarEscaneando": {
+        "properties": {
+          "estado": {
+            "type": "string",
+            "title": "Estado",
+            "default": "escaneando"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CompletarEscaneando"
+      },
+      "ConfirmResult": {
+        "properties": {
+          "lote": {
+            "$ref": "#/components/schemas/LoteSummary"
+          },
+          "insertadas": {
+            "type": "integer",
+            "title": "Insertadas"
+          },
+          "actualizadas": {
+            "type": "integer",
+            "title": "Actualizadas"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lote",
+          "insertadas",
+          "actualizadas",
+          "revision"
+        ],
+        "title": "ConfirmResult"
+      },
+      "ContactoIn": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Nombre"
+          },
+          "telefono": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 10,
+            "title": "Telefono"
+          },
+          "correo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "telefono"
+        ],
+        "title": "ContactoIn"
+      },
+      "ContactoOut": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "telefono": {
+            "type": "string",
+            "title": "Telefono"
+          },
+          "correo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          },
+          "capturado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Capturado Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "telefono",
+          "capturado_utc"
+        ],
+        "title": "ContactoOut"
+      },
+      "ContactoResponse": {
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "telefono": {
+            "type": "string",
+            "title": "Telefono"
+          },
+          "correo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correo"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          },
+          "capturado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Capturado Utc"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nombre",
+          "telefono",
+          "capturado_utc",
+          "etag"
+        ],
+        "title": "ContactoResponse"
+      },
+      "DecisionIn": {
+        "properties": {
+          "num_fila": {
+            "type": "integer",
+            "minimum": 2.0,
+            "title": "Num Fila"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "aprobar",
+              "excluir"
+            ],
+            "title": "Decision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_fila",
+          "decision"
+        ],
+        "title": "DecisionIn"
+      },
+      "DescartarIn": {
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Motivo"
+          },
+          "comentario": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Comentario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "motivo",
+          "comentario"
+        ],
+        "title": "DescartarIn"
+      },
+      "DevolverIn": {
+        "properties": {
+          "estatus_destino": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Estatus Destino"
+          },
+          "motivo": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Motivo"
+          },
+          "comentario": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Comentario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estatus_destino",
+          "motivo",
+          "comentario"
+        ],
+        "title": "DevolverIn"
+      },
+      "EquivalenciaBody": {
+        "properties": {
+          "correo": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Correo"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "correo"
+        ],
+        "title": "EquivalenciaBody"
+      },
+      "EquivalenciaIn": {
+        "properties": {
+          "usuario_codigo": {
+            "type": "string",
+            "pattern": "^[a-z]{3,10}$",
+            "title": "Usuario Codigo"
+          },
+          "correo": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Correo"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "usuario_codigo",
+          "correo"
+        ],
+        "title": "EquivalenciaIn"
+      },
+      "EquivalenciaOut": {
+        "properties": {
+          "usuario_codigo": {
+            "type": "string",
+            "title": "Usuario Codigo"
+          },
+          "correo": {
+            "type": "string",
+            "title": "Correo"
+          },
+          "oid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oid"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo"
+          },
+          "actualizado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usuario_codigo",
+          "correo",
+          "oid",
+          "nombre",
+          "activo",
+          "actualizado_utc"
+        ],
+        "title": "EquivalenciaOut"
+      },
+      "EstatusItem": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          },
+          "terminal": {
+            "type": "boolean",
+            "title": "Terminal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "nombre",
+          "orden",
+          "terminal"
+        ],
+        "title": "EstatusItem"
+      },
+      "FilaOut": {
+        "properties": {
+          "num_fila": {
+            "type": "integer",
+            "title": "Num Fila"
+          },
+          "resultado": {
+            "type": "string",
+            "title": "Resultado"
+          },
+          "motivos": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Motivos"
+          },
+          "decision_admin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Admin"
+          },
+          "origen_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origen Id"
+          },
+          "accion_prevista": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accion Prevista"
+          },
+          "datos": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Datos"
+          },
+          "normalizado": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "num_fila",
+          "resultado",
+          "motivos",
+          "decision_admin",
+          "origen_id",
+          "accion_prevista",
+          "datos",
+          "normalizado"
+        ],
+        "title": "FilaOut"
+      },
+      "FilasPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FilaOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "FilasPage"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HistorialItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sitio_id": {
+            "type": "integer",
+            "title": "Sitio Id"
+          },
+          "estatus_anterior": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estatus Anterior"
+          },
+          "estatus_nuevo": {
+            "type": "string",
+            "title": "Estatus Nuevo"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "usuario_oid": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Usuario Oid"
+          },
+          "fecha_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Utc"
+          },
+          "origen": {
+            "type": "string",
+            "title": "Origen"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sitio_id",
+          "estatus_anterior",
+          "estatus_nuevo",
+          "tipo",
+          "motivo",
+          "comentario",
+          "usuario_oid",
+          "fecha_utc",
+          "origen"
+        ],
+        "title": "HistorialItem"
+      },
+      "LoteDetail": {
+        "properties": {
+          "lote": {
+            "$ref": "#/components/schemas/LoteSummary"
+          },
+          "filas": {
+            "$ref": "#/components/schemas/FilasPage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lote",
+          "filas"
+        ],
+        "title": "LoteDetail"
+      },
+      "LoteSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "archivo_nombre": {
+            "type": "string",
+            "title": "Archivo Nombre"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash"
+          },
+          "fecha_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Utc"
+          },
+          "filas_total": {
+            "type": "integer",
+            "title": "Filas Total"
+          },
+          "filas_ok": {
+            "type": "integer",
+            "title": "Filas Ok"
+          },
+          "filas_advertencia": {
+            "type": "integer",
+            "title": "Filas Advertencia"
+          },
+          "filas_error": {
+            "type": "integer",
+            "title": "Filas Error"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "confirmado_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmado Utc"
+          },
+          "filas_insertadas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filas Insertadas"
+          },
+          "filas_actualizadas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filas Actualizadas"
+          },
+          "filas_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filas Revision"
+          },
+          "pendientes_decision": {
+            "type": "integer",
+            "title": "Pendientes Decision",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "archivo_nombre",
+          "hash",
+          "fecha_utc",
+          "filas_total",
+          "filas_ok",
+          "filas_advertencia",
+          "filas_error",
+          "estado"
+        ],
+        "title": "LoteSummary"
+      },
+      "MeResponse": {
+        "properties": {
+          "oid": {
+            "type": "string",
+            "title": "Oid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "oid",
+          "name",
+          "username",
+          "roles"
+        ],
+        "title": "MeResponse"
+      },
+      "MotivoItem": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "nombre"
+        ],
+        "title": "MotivoItem"
+      },
+      "NotificacionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificacionOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "no_leidas": {
+            "type": "integer",
+            "title": "No Leidas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "no_leidas"
+        ],
+        "title": "NotificacionList"
+      },
+      "NotificacionOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sitio_id": {
+            "type": "integer",
+            "title": "Sitio Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "cuerpo": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Cuerpo"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "creado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creado Utc"
+          },
+          "leida": {
+            "type": "boolean",
+            "title": "Leida"
+          },
+          "leida_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leida Utc"
+          },
+          "enviada_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enviada Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sitio_id",
+          "tipo",
+          "cuerpo",
+          "estado",
+          "creado_utc",
+          "leida",
+          "leida_utc",
+          "enviada_utc"
+        ],
+        "title": "NotificacionOut"
+      },
+      "PartesOut": {
+        "properties": {
+          "partes_recibidas": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Partes Recibidas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "partes_recibidas"
+        ],
+        "title": "PartesOut"
+      },
+      "ReasignarIn": {
+        "properties": {
+          "coordinador_oid": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Coordinador Oid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coordinador_oid"
+        ],
+        "title": "ReasignarIn"
+      },
+      "SitioDelta": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SitioDetail"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "removed_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Removed Ids"
+          },
+          "max_rowversion": {
+            "type": "string",
+            "title": "Max Rowversion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "removed_ids",
+          "max_rowversion"
+        ],
+        "title": "SitioDelta"
+      },
+      "SitioDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "origen_id": {
+            "type": "integer",
+            "title": "Origen Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "lat": {
+            "type": "string",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "string",
+            "title": "Lon"
+          },
+          "potencial": {
+            "type": "string",
+            "title": "Potencial"
+          },
+          "campos_capturados": {
+            "type": "integer",
+            "title": "Campos Capturados"
+          },
+          "campos_total": {
+            "type": "integer",
+            "title": "Campos Total"
+          },
+          "estatus": {
+            "type": "string",
+            "title": "Estatus"
+          },
+          "devuelto": {
+            "type": "boolean",
+            "title": "Devuelto"
+          },
+          "usuario_codigo": {
+            "type": "string",
+            "title": "Usuario Codigo"
+          },
+          "en_revision_admin": {
+            "type": "boolean",
+            "title": "En Revision Admin"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
+          },
+          "actualizado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado Utc"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag"
+          },
+          "gps_texto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gps Texto"
+          },
+          "fecha_origen_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Origen Utc"
+          },
+          "devolucion_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Devolucion Motivo"
+          },
+          "devolucion_comentario": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Devolucion Comentario"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContactoOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "visita": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VisitaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "archivos": {
+            "items": {
+              "$ref": "#/components/schemas/ArchivoOut"
+            },
+            "type": "array",
+            "title": "Archivos",
+            "default": []
+          },
+          "coordinador_oid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinador Oid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "origen_id",
+          "nombre",
+          "region",
+          "lat",
+          "lon",
+          "potencial",
+          "campos_capturados",
+          "campos_total",
+          "estatus",
+          "devuelto",
+          "usuario_codigo",
+          "en_revision_admin",
+          "vigente",
+          "actualizado_utc",
+          "etag",
+          "fecha_origen_utc"
+        ],
+        "title": "SitioDetail"
+      },
+      "SitioListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "origen_id": {
+            "type": "integer",
+            "title": "Origen Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "region": {
+            "type": "string",
+            "title": "Region"
+          },
+          "lat": {
+            "type": "string",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "string",
+            "title": "Lon"
+          },
+          "potencial": {
+            "type": "string",
+            "title": "Potencial"
+          },
+          "campos_capturados": {
+            "type": "integer",
+            "title": "Campos Capturados"
+          },
+          "campos_total": {
+            "type": "integer",
+            "title": "Campos Total"
+          },
+          "estatus": {
+            "type": "string",
+            "title": "Estatus"
+          },
+          "devuelto": {
+            "type": "boolean",
+            "title": "Devuelto"
+          },
+          "usuario_codigo": {
+            "type": "string",
+            "title": "Usuario Codigo"
+          },
+          "en_revision_admin": {
+            "type": "boolean",
+            "title": "En Revision Admin"
+          },
+          "vigente": {
+            "type": "boolean",
+            "title": "Vigente"
+          },
+          "actualizado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Actualizado Utc"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "origen_id",
+          "nombre",
+          "region",
+          "lat",
+          "lon",
+          "potencial",
+          "campos_capturados",
+          "campos_total",
+          "estatus",
+          "devuelto",
+          "usuario_codigo",
+          "en_revision_admin",
+          "vigente",
+          "actualizado_utc",
+          "etag"
+        ],
+        "title": "SitioListItem"
+      },
+      "SitioPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SitioListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "SitioPage"
+      },
+      "SubidaCreate": {
+        "properties": {
+          "sitio_id": {
+            "type": "integer",
+            "title": "Sitio Id"
+          },
+          "tipo": {
+            "type": "string",
+            "pattern": "^(foto|documento)$",
+            "title": "Tipo"
+          },
+          "tipo_documento": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
+          },
+          "nombre_original": {
+            "type": "string",
+            "maxLength": 260,
+            "minLength": 1,
+            "title": "Nombre Original"
+          },
+          "content_type": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 3,
+            "title": "Content Type"
+          },
+          "bytes_total": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Bytes Total"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sitio_id",
+          "tipo",
+          "nombre_original",
+          "content_type",
+          "bytes_total",
+          "sha256"
+        ],
+        "title": "SubidaCreate"
+      },
+      "SubidaOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "sitio_id": {
+            "type": "integer",
+            "title": "Sitio Id"
+          },
+          "tipo": {
+            "type": "string",
+            "title": "Tipo"
+          },
+          "tipo_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "tamano_parte": {
+            "type": "integer",
+            "title": "Tamano Parte"
+          },
+          "partes_total": {
+            "type": "integer",
+            "title": "Partes Total"
+          },
+          "partes_recibidas": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Partes Recibidas"
+          },
+          "expira_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expira Utc"
+          },
+          "motivo_rechazo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Rechazo"
+          },
+          "archivo_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivo Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sitio_id",
+          "tipo",
+          "estado",
+          "tamano_parte",
+          "partes_total",
+          "partes_recibidas",
+          "expira_utc"
+        ],
+        "title": "SubidaOut"
+      },
+      "TipoDocumentoItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "requerido_en_estatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requerido En Estatus"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "requerido_en_estatus",
+          "orden"
+        ],
+        "title": "TipoDocumentoItem"
+      },
+      "TransicionIn": {
+        "properties": {
+          "estatus_destino": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Estatus Destino"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estatus_destino"
+        ],
+        "title": "TransicionIn"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VisitaIn": {
+        "properties": {
+          "frente_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Frente M"
+          },
+          "fondo_m": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Fondo M"
+          },
+          "area_m2": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000000.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area M2"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          },
+          "fecha_visita_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Visita Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frente_m",
+          "fondo_m"
+        ],
+        "title": "VisitaIn"
+      },
+      "VisitaOut": {
+        "properties": {
+          "frente_m": {
+            "type": "string",
+            "title": "Frente M"
+          },
+          "fondo_m": {
+            "type": "string",
+            "title": "Fondo M"
+          },
+          "area_m2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area M2"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          },
+          "fecha_visita_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Visita Utc"
+          },
+          "capturado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Capturado Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frente_m",
+          "fondo_m",
+          "fecha_visita_utc",
+          "capturado_utc"
+        ],
+        "title": "VisitaOut"
+      },
+      "VisitaResponse": {
+        "properties": {
+          "frente_m": {
+            "type": "string",
+            "title": "Frente M"
+          },
+          "fondo_m": {
+            "type": "string",
+            "title": "Fondo M"
+          },
+          "area_m2": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area M2"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          },
+          "fecha_visita_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Visita Utc"
+          },
+          "capturado_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Capturado Utc"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "frente_m",
+          "fondo_m",
+          "fecha_visita_utc",
+          "capturado_utc",
+          "etag"
+        ],
+        "title": "VisitaResponse"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

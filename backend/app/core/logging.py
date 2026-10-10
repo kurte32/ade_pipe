@@ -51,7 +51,7 @@ def _drop_forbidden(
 
 def configure_logging(level: str = "INFO") -> None:
     logging.basicConfig(
-        format="%(message)s", stream=sys.stdout, level=getattr(logging, level.upper(), logging.INFO)
+        format="%(message)s", stream=sys.stderr, level=getattr(logging, level.upper(), logging.INFO)
     )
     for noisy in ("azure", "urllib3", "uvicorn.access"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
@@ -67,7 +67,7 @@ def configure_logging(level: str = "INFO") -> None:
         wrapper_class=structlog.make_filtering_bound_logger(
             getattr(logging, level.upper(), logging.INFO)
         ),
-        logger_factory=structlog.PrintLoggerFactory(sys.stdout),
+        logger_factory=structlog.PrintLoggerFactory(sys.stderr),
         cache_logger_on_first_use=True,
     )
 
