@@ -49,7 +49,9 @@ See `IMPLEMENTATION_STATUS.md` for the full table with evidence per RF, RNF and 
 
 ## 4. Running locally
 
-Full guide: `LOCAL_DEVELOPMENT.md`. Verified from a clean state on 2026-10-10:
+Full guide: `LOCAL_DEVELOPMENT.md`. Verified from clean volumes on 2026-10-10 (audit finding D-01:
+`.env.example` was untracked, so a real `git clone` could not run the first line until the fix; see
+`docs/audit/`):
 
 ```bash
 cp .env.example .env
@@ -100,6 +102,13 @@ The Claude in Chrome extension was not connected during the build. It became ava
 Not covered by browser tests: MSAL sign-in (no tenant), installed PWA behavior on Android (no device), 150 MB uploads (test files are small).
 
 ## 7. Security and reliability validation
+
+> **Audit correction (2026-10-10):** an independent audit found that optimistic concurrency was
+> **not** enforced at the database — the ETag/rowversion check ran in Python, so concurrent writes
+> with the same ETag all committed (finding B-01, Critical). The "optimistic concurrency" item below
+> should not be read as validated until the `version_id_col` fix in `docs/audit/REMEDIATION_PLAN.md`
+> is applied and verified. The audit also qualifies the idempotency claim (B-02: concurrent replays
+> return 500, not the stored response). See `docs/audit/`.
 
 Validated locally with automated tests: token validation negatives, role enforcement, three-layer isolation including pooled connections and raw SQL, block predicates, least-privilege grants, append-only ledger behavior, file type by signature, PDF structure and limits, hash verification, idempotent replay, optimistic concurrency, outbox retry and dead-letter, upload session expiry, purge with retained metadata, audit on every write and download, Problem Details without stack traces, log redaction of personal data keys, production configuration guard.
 

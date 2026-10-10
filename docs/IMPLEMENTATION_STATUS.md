@@ -1,5 +1,12 @@
 # Implementation status
 
+> **Audit note (2026-10-10):** an independent adversarial audit found one Critical defect (B-01,
+> optimistic concurrency not enforced at the database), two High defects (D-01 untracked
+> `.env.example`; E-1 offline sync wedges on transient 5xx), and a broken deploy path. The system is
+> **not production-ready** until these are resolved. Several "implemented and locally verified" and
+> "statically validated" rows below are qualified by findings in `docs/audit/`. Read that set
+> alongside this table.
+
 Updated: 2026-10-10 (final for this build). Verification vocabulary used below: `implemented and locally verified` (automated test executed against the local stack), `statically validated` (lint, build or template validation only), `validated in a test Azure environment` (none in this build), `deployed and verified in Azure` (none in this build), `not verified`. Original statuses: `not started` · `in progress` · `implemented` · `tested locally` (automated test executed and passing) · `statically validated` (lint/build only, no runtime) · `unverified` (needs Azure or a device) · `blocked` (external dependency).
 
 ## Baseline findings (Phase One)
@@ -66,4 +73,4 @@ Updated: 2026-10-10 (final for this build). Verification vocabulary used below: 
 | Bicep templates per `AZURE_DESIGN.md` | statically validated | 13 modules + 3 param files, `bash infra/bicep/validate.sh` passes; nothing deployed |
 | GitHub Actions CI/CD | statically validated | ci, build-deploy, deploy-environment, drift; actionlint clean; never executed on GitHub |
 | Observability (structured logs, correlation, App Insights) | implemented | JSON logs, correlation id header, forbidden-field redaction; App Insights wiring unverified locally |
-| Local development guide verified from clean clone | verified | `make reset && make up` (42 s) `&& make db-seed`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm dev`, `make e2e` (14 passed), `make test` (125 passed) on 2026-10-10 |
+| Local development guide verified from clean volumes | verified (clean volumes, not a clean clone) | `make reset && make up` (42 s) `&& make db-seed`, `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm dev`, `make e2e` (14 passed), `make test` (125 passed) on 2026-10-10. Audit finding D-01: `.env.example` was untracked, so a real `git clone` could not run this until the fix; see `docs/audit/`. |
