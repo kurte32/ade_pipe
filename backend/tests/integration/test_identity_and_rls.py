@@ -60,19 +60,23 @@ def test_admin_route_requires_admin(client, coord_a_headers, admin_headers) -> N
 # ---------------------------------------------------------------------------------------------
 
 
+def _all_ids(client, headers) -> set[int]:  # type: ignore[no-untyped-def]
+    """Collect every site id across pages so the assertion is robust to DB size (audit C6)."""
+    ids: set[int] = set()
+    cursor: str | None = None
+    while True:
+        url = "/api/v1/sitios?limit=200" + (f"&cursor={cursor}" if cursor else "")
+        page = client.get(url, headers=headers).json()
+        ids.update(s["id"] for s in page["items"])
+        cursor = page.get("next_cursor")
+        if not cursor:
+            return ids
+
+
 def test_list_only_mine(client, coord_a_headers, coord_b_headers, admin_headers, two_sites) -> None:  # type: ignore[no-untyped-def]
-    ids_a = {
-        s["id"]
-        for s in client.get("/api/v1/sitios?limit=200", headers=coord_a_headers).json()["items"]
-    }
-    ids_b = {
-        s["id"]
-        for s in client.get("/api/v1/sitios?limit=200", headers=coord_b_headers).json()["items"]
-    }
-    ids_admin = {
-        s["id"]
-        for s in client.get("/api/v1/sitios?limit=200", headers=admin_headers).json()["items"]
-    }
+    ids_a = _all_ids(client, coord_a_headers)
+    ids_b = _all_ids(client, coord_b_headers)
+    ids_admin = _all_ids(client, admin_headers)
     assert two_sites["a"] in ids_a and two_sites["b"] not in ids_a
     assert two_sites["b"] in ids_b and two_sites["a"] not in ids_b
     assert {two_sites["a"], two_sites["b"]} <= ids_admin

@@ -29,10 +29,8 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], baseURL: process.env.ADMIN_URL ?? "http://localhost:5174" },
       testMatch: /admin\..*\.spec\.ts/,
     },
-    {
-      name: "flows",
-      use: { ...devices["Desktop Chrome"] },
-      testMatch: /flow\..*\.spec\.ts/,
-    },
+    // The coordinator flow (pwa.flow.spec.ts) runs under pwa-mobile above. The former "flows"
+    // desktop project matched nothing (its testMatch lacked the leading dot) and is removed to
+    // avoid implying desktop flow coverage that never ran (audit C11).
   ],
 });

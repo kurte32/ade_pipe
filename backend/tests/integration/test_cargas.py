@@ -240,14 +240,21 @@ def test_full_load_preview_decisions_confirm_and_rls(
 def test_reload_updates_without_touching_progress(
     client, admin_headers, seeded_equivalencias
 ) -> None:  # type: ignore[no-untyped-def]
-    # pick an 'ard' site created by the previous test and advance it manually
-    ard_sites = [
-        s
-        for s in client.get("/api/v1/sitios", headers=admin_headers, params={"limit": 200}).json()[
-            "items"
-        ]
-        if s["origen_id"] >= OFFSET and s["usuario_codigo"] == "ard"
-    ]
+    # pick an 'ard' site created by the previous test and advance it manually. Page through the list
+    # so this does not depend on the fixtures landing on the first 200-row page as the DB grows
+    # (audit C6). This test still depends on test_full_load having run (its lot provides these sites,
+    # including the one excluded there that becomes a new insert on reload) — see audit C4.
+    ard_sites: list[dict] = []
+    cursor: str | None = None
+    while True:
+        url = "/api/v1/sitios?limit=200" + (f"&cursor={cursor}" if cursor else "")
+        page = client.get(url, headers=admin_headers).json()
+        ard_sites.extend(
+            s for s in page["items"] if s["origen_id"] >= OFFSET and s["usuario_codigo"] == "ard"
+        )
+        cursor = page.get("next_cursor")
+        if not cursor:
+            break
     target = ard_sites[0]
     with system_session() as s:
         s.execute(
