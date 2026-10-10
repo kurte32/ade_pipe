@@ -85,7 +85,7 @@ jobs:
 
       - name: Deploy PWA to Static Web Apps
         run: |
-          TOKEN=$(az staticwebapp secrets list -g "$RG" -n "${{ steps.deploy.outputs.pwaHostname }}" --query properties.apiKey -o tsv 2>/dev/null || az staticwebapp secrets list -g "$RG" -n "swa-pipeline-pwa-$ENV" --query properties.apiKey -o tsv)
+          TOKEN=$(az staticwebapp secrets list -g "$RG" -n "swa-pipeline-pwa-$ENV" --query properties.apiKey -o tsv)
           echo "::add-mask::$TOKEN"
           echo "SWA_PWA_TOKEN=$TOKEN" >> "$GITHUB_ENV"
       - uses: Azure/static-web-apps-deploy@v1

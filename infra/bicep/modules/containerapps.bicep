@@ -219,7 +219,7 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 var jobs = [
-  { name: 'migrate', trigger: 'Manual', cron: '', command: ['alembic', 'upgrade', 'head'], identityId: migrationIdentityId, env: migrationEnv, timeout: 1800 }
+  { name: 'migrate', trigger: 'Manual', cron: '', command: ['sh', '-c', 'python -m app.cli db-init && alembic upgrade head'], identityId: migrationIdentityId, env: migrationEnv, timeout: 1800 }
   { name: 'promote', trigger: 'Schedule', cron: '*/1 * * * *', command: ['python', '-m', 'app.jobs.run', 'promote'], identityId: apiIdentityId, env: apiEnv, timeout: 600 }
   { name: 'outbox', trigger: 'Schedule', cron: '*/1 * * * *', command: ['python', '-m', 'app.jobs.run', 'outbox'], identityId: apiIdentityId, env: apiEnv, timeout: 300 }
   { name: 'expire-uploads', trigger: 'Schedule', cron: '*/10 * * * *', command: ['python', '-m', 'app.jobs.run', 'expire_uploads'], identityId: apiIdentityId, env: apiEnv, timeout: 600 }

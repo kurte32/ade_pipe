@@ -25,10 +25,19 @@ log = structlog.get_logger()
 def db_init() -> None:
     settings = get_settings()
     if settings.db_auth == "entra":
-        log.info(
-            "db_init_skipped",
-            reason="Entra auth: database and users are provisioned by Bicep and the migration job",
-        )
+        # Azure: the database exists (Bicep). Running as the migration identity (Entra admin),
+        # create the contained user for the API managed identity so the baseline migration can
+        # add it to pipeline_app_role. Idempotent.
+        user = settings.db_user
+        engine = build_engine(settings)
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(
+                text(  # noqa: S608
+                    f"IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'{user}') "
+                    f"CREATE USER [{user}] FROM EXTERNAL PROVIDER"
+                )
+            )
+        log.info("db_init_done", database=settings.db_name, app_user=user, auth="entra")
         return
     master = build_engine(settings, admin=True, database="master")
     for _ in range(60):

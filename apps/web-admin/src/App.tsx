@@ -1,24 +1,36 @@
-import type { components } from "@pipeline/api-client";
+import "./admin.css";
+
 import { SignIn, useAuth } from "@pipeline/auth/react";
-import { EstatusBadge, ProblemAlert, Spinner } from "@pipeline/ui";
-import { useQuery } from "@tanstack/react-query";
+import { Spinner } from "@pipeline/ui";
 import type { ReactNode } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { NavLink, Route, Routes } from "react-router-dom";
 
-import { useApi } from "./api";
-
-type SitioPage = components["schemas"]["SitioPage"];
+import { Auditoria } from "./pages/Auditoria";
+import { CargaDetail } from "./pages/CargaDetail";
+import { Cargas } from "./pages/Cargas";
+import { Equivalencias } from "./pages/Equivalencias";
+import { Resumen } from "./pages/Resumen";
+import { SitioDetailPage } from "./pages/SitioDetail";
+import { Sitios } from "./pages/Sitios";
 
 function Shell({ children }: { children: ReactNode }) {
   const { account, logout } = useAuth();
   return (
     <>
       <header className="topbar">
-        <nav>
-          <Link to="/">Sitios</Link>
+        <nav aria-label="Principal">
+          <NavLink to="/" end>
+            Resumen
+          </NavLink>
+          <NavLink to="/sitios">Sitios</NavLink>
+          <NavLink to="/cargas">Cargas</NavLink>
+          <NavLink to="/equivalencias">Equivalencias</NavLink>
+          <NavLink to="/auditoria">Auditoría</NavLink>
         </nav>
         <div className="row">
-          <span className="muted">{account?.name}</span>
+          <span className="muted" data-testid="account-name">
+            {account?.name}
+          </span>
           <button type="button" className="secondary" onClick={() => void logout()}>
             Salir
           </button>
@@ -26,34 +38,6 @@ function Shell({ children }: { children: ReactNode }) {
       </header>
       {children}
     </>
-  );
-}
-
-function MisSitios() {
-  const api = useApi();
-  const q = useQuery({
-    queryKey: ["sitios"],
-    queryFn: () => api.get<SitioPage>("/api/v1/sitios?limit=200"),
-  });
-  if (q.isPending) return <Spinner label="Cargando sitios" />;
-  if (q.isError) return <ProblemAlert error={q.error} onRetry={() => void q.refetch()} />;
-  return (
-    <main>
-      <h1>Sitios</h1>
-      {q.data.items.length === 0 ? <p className="muted">No hay sitios cargados.</p> : null}
-      <ul className="list" data-testid="sitios-list">
-        {q.data.items.map((s) => (
-          <li key={s.id}>
-            <Link to={`/sitios/${s.id}`}>
-              <strong>{s.nombre}</strong> <span className="muted">#{s.origen_id} · {s.region}</span>
-              <div>
-                <EstatusBadge estatus={s.estatus} devuelto={s.devuelto} />
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </main>
   );
 }
 
@@ -66,8 +50,14 @@ export function App() {
   return (
     <Shell>
       <Routes>
-        <Route path="/" element={<MisSitios />} />
-        <Route path="*" element={<MisSitios />} />
+        <Route path="/" element={<Resumen />} />
+        <Route path="/sitios" element={<Sitios />} />
+        <Route path="/sitios/:id" element={<SitioDetailPage />} />
+        <Route path="/cargas" element={<Cargas />} />
+        <Route path="/cargas/:id" element={<CargaDetail />} />
+        <Route path="/equivalencias" element={<Equivalencias />} />
+        <Route path="/auditoria" element={<Auditoria />} />
+        <Route path="*" element={<Resumen />} />
       </Routes>
     </Shell>
   );
