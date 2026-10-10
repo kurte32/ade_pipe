@@ -54,7 +54,7 @@ with any local substitute enabled.
 | Limits (`PDF_MAX_BYTES`, `PDF_MAX_PAGES`, `UPLOAD_CHUNK_BYTES`, `PHOTO_MAX_BYTES`, `LOAD_MAX_ROWS`, `LOAD_MAX_BYTES`, `DUPLICATE_DISTANCE_METERS`, `SUSPICIOUS_NAME_WORDS`) | `.env.example` defaults | same | config.py defaults (add to `commonEnv` in `containerapps.bicep` to override) |
 | `RETENTION_YEARS` | default 5 | 5 | param `retentionYears` |
 
-Frontend build variables (`VITE_*`) are compile-time: local `.env.local` files in each app with
+Frontend build variables (`VITE_*`) are compile-time: local `.env.development` files in each app with
 `VITE_AUTH_MODE=dev`; CI and Azure builds set `VITE_AUTH_MODE=msal` and the tenant and client ids from
 GitHub environment variables.
 

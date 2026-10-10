@@ -73,7 +73,7 @@ pnpm dev           # PWA http://localhost:5173, admin http://localhost:5174
 | `pnpm build` (both apps, PWA service worker generated) | success |
 | `bash infra/bicep/validate.sh` | 13 modules, 3 parameter files pass build and lint |
 | `pip-audit` on the locked backend dependencies | no known vulnerabilities |
-| `pnpm audit --audit-level moderate` after upgrading vitest to 4.1.11 | no known vulnerabilities |
+| `pnpm audit --audit-level high` (matching ci.yml) after upgrading vitest to 4.1.11 | no known vulnerabilities |
 | actionlint and YAML parse of 4 workflows | clean (run by the infra fork; never executed on GitHub) |
 
 What the backend integration tests cover: token negatives (expired, wrong audience, issuer, tenant, missing or wrong scope, unknown client, missing or malformed oid, bad signature), 401/403 paths, cross-coordinator isolation at API and at database level on a reused pooled connection, block predicate on cross-owner insert, app role denied on ledger tables and security policy, contact and visit upsert with idempotent replay, transition chain with threaded ETags, 428, 412 with current state, 422 with missing requirements, admin return with history, outbox and in-app notice, outbox retry and failure path, reassignment, audit viewer, bulk load of the 87-row file with rule counts, decisions, confirm, reload semantics, invalid files, resumable 3-part upload with lost and re-sent parts, hash mismatch, encrypted and over-limit PDFs, type spoofing, Range downloads, versioning of documents, soft delete, session expiry, purge.

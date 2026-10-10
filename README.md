@@ -7,7 +7,7 @@ Pipeline de Posibles Tiendas: regional coordinators manage candidate store sites
 ```bash
 cp .env.example .env
 make up            # SQL Server 2022, Azurite, local OIDC issuer, API (+ migrations), scheduler
-make db-seed       # 10 dev coordinators and 87 synthetic sites
+make db-seed       # 10 coordinator equivalences and 87 synthetic sites
 corepack enable pnpm && pnpm install
 pnpm dev           # PWA http://localhost:5173 · admin http://localhost:5174
 make test && make e2e

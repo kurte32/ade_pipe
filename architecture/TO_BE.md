@@ -129,7 +129,7 @@ Additions to TDD section 6 (Recommendation):
 | `notificacion_outbox` | Pending Teams notifications with attempts, state, next attempt time. |
 | `estatus` | Status catalog with order and a terminal flag. |
 | `motivo_devolucion` | Return reason catalog (TDD pendiente 8). |
-| `coordinador_oid` on `sitio_contacto`, `sitio_visita`, `sitio_archivo` | Denormalized for a cheap RLS predicate; maintained by the service layer and checked by a trigger. |
+| `coordinador_oid` on `sitio_contacto`, `sitio_visita`, `sitio_archivo` | Denormalized for a cheap RLS predicate; maintained by the service layer (transitions copy the parent's oid on capture and reassignment). A database trigger to enforce parent/child consistency was intended but is not in the baseline migration (audit B-07); it is recommended defense-in-depth, deferred. |
 | `sitio.fecha_origen_texto` | Original FECHA text from the load file, for audit. |
 
 Removed or reduced (Recommendation): `requisito_transicion` is reduced to transition parameters. Rules live in code (ADR-005 companion note in TO_BE section 6).

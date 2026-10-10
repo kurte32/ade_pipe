@@ -72,7 +72,7 @@ Admin web, site detail, "Reasignar". The previous coordinator's device removes t
 Runs daily. Review `SELECT COUNT(*) FROM sitio_archivo WHERE estado = 'purgado' AND purgado_utc > DATEADD(day, -1, SYSUTCDATETIME())`. A legal hold on a blob makes the delete fail; the job logs `purge_skipped` with the blob path and tries again the next day.
 
 ### RB-08 Restoring the database
-Azure: point-in-time restore of the Azure SQL database to a new database name, then swap the connection (Container App secret or Key Vault reference) and redeploy. Ledger tables keep their digests; verify with `sys.sp_verify_database_ledger` after restore. Local: `make reset && make up && make db-seed`.
+Azure: point-in-time restore of the Azure SQL database to a new database name, then repoint the API by updating the `DB_HOST`/`DB_NAME` container-app environment variables (they are plain env vars, not a Key Vault reference) and redeploy. Ledger tables keep their digests; external digest storage is not configured in this build, so `sys.sp_verify_database_ledger` validates only the in-database digest. Local: `make reset && make up && make db-seed`.
 
 ### RB-09 Rolling back a release
 The container app runs in multiple-revision mode and keeps the previous revision active.
@@ -89,7 +89,7 @@ restore point. If the previous revision is gone, redeploy its image digest throu
 | Store | Mechanism | Local equivalent |
 |---|---|---|
 | Azure SQL | Automated backups with point-in-time restore, long-term retention configured in Bicep | Docker volume `sqldata`; `make reset` destroys it |
-| Documents (ADLS Gen2) | Soft delete, versioning, immutability policy; geo-redundant storage | Azurite volume `azuritedata` |
+| Documents (ADLS Gen2) | Soft delete, container-level immutability policy; geo-redundant storage (blob versioning is off — unavailable on the hierarchical-namespace account, which is why container immutability is used; see ADR-003) | Azurite volume `azuritedata` |
 | Staging | Transient; lifecycle deletes after 7 days | same |
 | Audit ledger | Append-only; digests can be stored externally (not configured in this build) | same table type in SQL Server 2022 |
 
