@@ -97,5 +97,35 @@ fixed/verified status in `TECHNICAL_FINDINGS.md` and `RISK_REGISTER.md`.
 
 ## Remediation status after this audit
 
-To be filled in as fixes are applied in this session (findings are committed first, fixes in separate
-commits).
+Findings were committed first; each fix is a separate commit with its regression test. All fixes were
+verified from a clean state: `make reset && make up` (51 s, migrations applied) `&& make db-seed`
+(10 equivalences + 87 sites) `&& make test` (131 passed) `&& make e2e` (14 passed); `pnpm -r test`
+(21 passed); ruff / mypy / eslint / tsc clean; `bash infra/bicep/validate.sh` (13 modules + 3 params).
+
+**Fixed and verified this session**
+
+| Finding | Sev | Fix | Verification |
+|---|---|---|---|
+| B-01 | Critical | `version_id_col` on the Sitio mapper; StaleDataError → 412 | New deterministic ORM test (red→green); API burst now `{201:1, 412:9}`; e2e stale-ETag test passes |
+| D-01 | High | `!.env.example` in .gitignore, file force-added | `git ls-tree` shows it in the committed tree |
+| E-1 | High | 429/5xx treated as transient with a retry cap; list badge; message | New vitest test (503 stays retryable, next sync drains); re-verified live in Chrome |
+| A1 | Medium | Production guard validates AUTH_JWKS_URL | Unit test: foreign JWKS URL refused |
+| A2 | Medium | validate_token filters token roles to known app roles | Unit test: "Sistema" from a token dropped |
+| B-03 | Medium | Chunk `known_ids` under the 2100-parameter cap | Integration test: 2500 known ids → 200 |
+| C10 | Info | alg:none and HS256-with-RSA-public-key negative tests | Both return 401 |
+| C11 | Info | Removed the dead Playwright `flows` project | 14 e2e still pass |
+| C6 | Medium | List assertions page through the cursor | Pass on the current (99-row) DB and by construction beyond 200 |
+| D-02 | Medium | Grant the migration identity Key Vault Secrets User | Bicep builds; statically validated |
+| D-05 | Medium | Deploy jobs depend only on build with a `!cancelled()` guard | Workflow YAML parses; statically validated |
+| D-08 | Low | SCAN_MODE derived from `enableDefenderScanning` | Bicep builds; statically validated |
+| D-10, D-11, B-07 | Low | Documentation corrected; TO_BE trigger claim amended | — |
+
+**Left as planned actions** (design change, larger scope, or needs Azure): B-02, B-04, B-05, B-06,
+A5 + D-12, D-06, D-07, D-03, D-04, C4 (self-provisioning rewrite), C5/C7/C8/C9 test hardening, and the
+remaining E-/Info UX items. These stay in the tiers above with acceptance criteria.
+
+**Production-readiness after remediation:** the Critical (B-01) and both High findings (D-01, E-1) are
+fixed and verified locally. The verdict remains **not production-ready** because the deploy path is
+still only statically corrected (D-02/D-05/D-08 fixed on inspection; D-03/D-04/D-06 still open) and
+nothing has been exercised in a real Azure environment. The system is a credible candidate for a
+staged rollout once the remaining deploy-path items are done and validated in a test subscription.

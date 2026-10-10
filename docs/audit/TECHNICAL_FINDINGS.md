@@ -14,6 +14,10 @@ Status: **CONFIRMED** (reproduced, command + output recorded) · **SUSPECTED** (
 Finding IDs keep their audit-stream prefix: A = identity/authz/RLS, B = business logic/data integrity,
 C = test quality, D = infra/CI-CD/docs, E = browser UX/offline reliability.
 
+> **Remediation (same session):** B-01, D-01, E-1, A1, A2, B-03, C6, C10, C11, D-02, D-05, D-08 and
+> the doc corrections (D-10, D-11, B-07) are fixed and verified — see the status table and verification
+> protocol in `REMEDIATION_PLAN.md`. The rest are left as planned actions there.
+
 ## Summary by severity
 
 | Sev | IDs |
