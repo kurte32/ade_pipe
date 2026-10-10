@@ -111,6 +111,7 @@ export async function retryOperation(db: PipelineDb, opId: string): Promise<void
     error: undefined,
     conflict: undefined,
     faltantes: undefined,
+    intentos: 0, // a manual retry starts the transient-retry budget over (audit E-1 follow-up)
     etagBase: cached?.etag ?? op.etagBase,
   });
 }
