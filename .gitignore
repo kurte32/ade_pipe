@@ -4,6 +4,7 @@ __pycache__/
 .env
 .env.*
 !apps/*/.env.development
+!.env.example
 *.log
 dist/
 spikes/**/local.settings.json
@@ -11,6 +12,8 @@ spikes/**/local.settings.json
 # local
 .env
 backend/.venv/
+backend/.coverage
+backend/.coverage.*
 backend/.pytest_cache/
 backend/.mypy_cache/
 backend/.ruff_cache/
