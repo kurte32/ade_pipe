@@ -1,0 +1,133 @@
+name: ade-pipeline
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD:?set SQL_SA_PASSWORD in .env}
+    ports:
+      - "${SQL_PORT:-1433}:1433"
+    volumes:
+      - sqldata:/var/opt/mssql
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "${SQL_SA_PASSWORD}", "-C", "-Q", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
+    ports:
+      - "${AZURITE_PORT:-10000}:10000"
+    volumes:
+      - azuritedata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:10000/devstoreaccount1?comp=list >/dev/null 2>&1 || exit 0"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  dev-idp:
+    build: ./tools/dev-idp
+    environment:
+      DEV_IDP_PUBLIC_URL: ${DEV_IDP_PUBLIC_URL:-http://localhost:8001}
+      DEV_TENANT_ID: ${AUTH_TENANT_ID}
+      DEV_API_CLIENT_ID: ${AUTH_AUDIENCE}
+    ports:
+      - "${DEV_IDP_PORT:-8001}:8001"
+    volumes:
+      - devidpkeys:/keys
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8001/healthz')\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      args:
+        INSTALL_DEV: "true"
+    command: ["/app/scripts/dev-entrypoint.sh"]
+    env_file: .env
+    environment:
+      DB_HOST: sqlserver
+      STORAGE_BLOB_ENDPOINT: http://azurite:10000/devstoreaccount1
+      DEV_IDP_URL: http://dev-idp:8001
+      AUTH_JWKS_URL: http://dev-idp:8001/${AUTH_TENANT_ID}/discovery/v2.0/keys
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+      dev-idp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  scheduler:
+    build:
+      context: ./backend
+      args:
+        INSTALL_DEV: "true"
+    command: ["python", "-m", "app.jobs.scheduler"]
+    env_file: .env
+    environment:
+      DB_HOST: sqlserver
+      STORAGE_BLOB_ENDPOINT: http://azurite:10000/devstoreaccount1
+      DEV_IDP_URL: http://dev-idp:8001
+      AUTH_JWKS_URL: http://dev-idp:8001/${AUTH_TENANT_ID}/discovery/v2.0/keys
+    volumes:
+      - ./backend:/app
+    depends_on:
+      api:
+        condition: service_healthy
+
+  pwa:
+    profiles: ["web"]
+    image: node:22-bookworm
+    working_dir: /work
+    command: sh -c "corepack enable pnpm && pnpm install --frozen-lockfile && pnpm --filter pwa-coordinador dev --host 0.0.0.0"
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8000
+      VITE_DEV_IDP_PROXY_TARGET: http://dev-idp:8001
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./:/work
+    depends_on:
+      api:
+        condition: service_healthy
+
+  admin:
+    profiles: ["web"]
+    image: node:22-bookworm
+    working_dir: /work
+    command: sh -c "corepack enable pnpm && pnpm install --frozen-lockfile && pnpm --filter web-admin dev --host 0.0.0.0"
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8000
+      VITE_DEV_IDP_PROXY_TARGET: http://dev-idp:8001
+    ports:
+      - "5174:5174"
+    volumes:
+      - ./:/work
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  sqldata:
+  azuritedata:
+  devidpkeys:

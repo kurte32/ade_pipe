@@ -1,0 +1,62 @@
+[project]
+name = "pipeline-api"
+version = "0.1.0"
+description = "Pipeline de Posibles Tiendas API"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "pyodbc>=5.1",
+    "alembic>=1.13",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "pyjwt[crypto]>=2.9",
+    "httpx>=0.27",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+    "xlrd>=2.0",
+    "pypdf>=4.3",
+    "python-multipart>=0.0.9",
+    "azure-storage-blob>=12.22",
+    "azure-identity>=1.17",
+    "structlog>=24.1",
+    "azure-monitor-opentelemetry>=1.6",
+    "filetype>=1.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pandas-stubs>=2.2",
+    "types-openpyxl>=3.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S", "W"]
+ignore = ["S101", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108", "E501"]
+"migrations/**" = ["E501"]
+"app/cli.py" = ["S608"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+exclude = ["migrations/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: needs the local compose stack"]
+filterwarnings = ["ignore::DeprecationWarning"]
