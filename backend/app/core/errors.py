@@ -8,6 +8,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.logging import current_correlation_id
 
@@ -104,6 +105,18 @@ def register_error_handlers(app: FastAPI) -> None:
             "Datos inválidos",
             "La petición no cumple el esquema.",
             {"errors": errors},
+        )
+
+    @app.exception_handler(StaleDataError)
+    async def _stale(request: Request, exc: StaleDataError) -> JSONResponse:
+        # The row's rowversion advanced between read and write (concurrent writer); the DB rejected
+        # the UPDATE (audit finding B-01). Report the same 412 the explicit If-Match check uses.
+        return _problem(
+            request,
+            412,
+            "precondition-failed",
+            "El registro cambió",
+            "El registro fue modificado por otra operación. Recarga y vuelve a intentar.",
         )
 
     @app.exception_handler(HTTPException)

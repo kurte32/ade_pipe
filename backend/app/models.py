@@ -165,6 +165,15 @@ class Sitio(Base):
         Index("ix_sitio_coordinador", "coordinador_oid", "vigente"),
         Index("ix_sitio_estatus", "estatus"),
     )
+    # Optimistic concurrency enforced at the database (audit finding B-01). The SQL Server
+    # ``rowversion`` is the version id: every UPDATE carries ``AND rowversion = <loaded value>`` and
+    # a zero-row update raises StaleDataError, which the service layer maps to the 412 response.
+    # ``version_id_generator=False`` means the database generates the value; SQLAlchemy re-reads it
+    # after each write via the column's FetchedValue server default.
+    __mapper_args__ = {
+        "version_id_col": rowversion,
+        "version_id_generator": False,
+    }
 
 
 class SitioContacto(Base):
