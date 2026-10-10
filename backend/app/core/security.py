@@ -88,8 +88,16 @@ def validate_token(token: str, settings: Settings) -> Claims:
         oid = UUID(str(oid_raw))
     except (TypeError, ValueError) as exc:
         raise _unauthorized("Token sin identificador de usuario") from exc
+    # Only recognised application roles may come from a token. Dropping anything else keeps an
+    # unexpected role string (e.g. a forged or misconfigured "Sistema") out of primary_role and
+    # therefore out of SESSION_CONTEXT('rol'), which RLS honours for Admin/Sistema (audit A2). The
+    # internal system identity is built directly in code, not via this path, so it is unaffected.
     roles_raw = payload.get("roles", [])
-    roles = tuple(str(r) for r in roles_raw) if isinstance(roles_raw, list) else ()
+    roles = (
+        tuple(str(r) for r in roles_raw if str(r) in KNOWN_ROLES)
+        if isinstance(roles_raw, list)
+        else ()
+    )
     return Claims(
         oid=oid,
         name=str(payload.get("name", "")),

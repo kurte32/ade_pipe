@@ -124,3 +124,97 @@ def test_production_guard_refuses_dev_modes() -> None:
             auth_issuer="http://localhost:8001/x/v2.0",
             auth_jwks_url="x",
         )
+
+
+def test_unknown_role_from_token_is_dropped(settings: Settings) -> None:
+    """A token may carry only recognised app roles; anything else is stripped (audit A2)."""
+    c = security.validate_token(token(roles=["Sistema"]), settings)
+    assert c.roles == ()
+    assert c.primary_role == "Ninguno"  # never reaches SESSION_CONTEXT('rol') as a privileged role
+    c2 = security.validate_token(token(roles=["Coordinador", "Sistema", "whatever"]), settings)
+    assert c2.roles == ("Coordinador",)
+
+
+def test_alg_none_token_rejected(settings: Settings) -> None:
+    """An unsigned (alg:none) token must be rejected (audit C10)."""
+    unsigned = jwt.encode(
+        {
+            "iss": ISS,
+            "aud": AUD,
+            "tid": TENANT,
+            "oid": "a0000000-0000-4000-8000-000000000001",
+            "scp": "access_as_user",
+            "azp": PWA,
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 600,
+        },
+        key=None,
+        algorithm="none",
+    )
+    with pytest.raises(AppError) as e:
+        security.validate_token(unsigned, settings)
+    assert e.value.status == 401
+
+
+def test_hs256_signed_with_rsa_public_key_rejected(settings: Settings) -> None:
+    """Algorithm-confusion: HS256 signed with the RSA public key must be rejected (audit C10).
+
+    PyJWT's encoder refuses to sign an HMAC token with an asymmetric key, so the token is forged by
+    hand (as an attacker would) and the decoder — pinned to RS256 — must reject it.
+    """
+    import base64
+    import hashlib
+    import hmac
+    import json
+
+    from cryptography.hazmat.primitives import serialization
+
+    pub_pem = KEY.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    def b64(raw: bytes) -> bytes:
+        return base64.urlsafe_b64encode(raw).rstrip(b"=")
+
+    header = b64(json.dumps({"alg": "HS256", "typ": "JWT", "kid": "k1"}).encode())
+    payload = b64(
+        json.dumps(
+            {
+                "iss": ISS,
+                "aud": AUD,
+                "tid": TENANT,
+                "oid": "a0000000-0000-4000-8000-000000000001",
+                "scp": "access_as_user",
+                "azp": PWA,
+                "roles": ["Admin"],
+                "iat": int(time.time()),
+                "exp": int(time.time()) + 600,
+            }
+        ).encode()
+    )
+    signing_input = header + b"." + payload
+    sig = b64(hmac.new(pub_pem, signing_input, hashlib.sha256).digest())
+    forged = (signing_input + b"." + sig).decode()
+
+    with pytest.raises(AppError) as e:
+        security.validate_token(forged, settings)
+    assert e.value.status == 401
+
+
+def test_production_guard_refuses_foreign_jwks_url() -> None:
+    """A correct issuer with a non-Entra JWKS endpoint must be refused (audit A1)."""
+    with pytest.raises(ValueError, match="AUTH_JWKS_URL"):
+        Settings(  # type: ignore[call-arg]
+            environment="production",
+            auth_mode="entra",
+            db_auth="entra",
+            storage_mode="azure",
+            scan_mode="defender",
+            notify_mode="graph",
+            directory_mode="graph",
+            auth_tenant_id=TENANT,
+            auth_audience=AUD,
+            auth_allowed_azp=PWA,
+            auth_issuer=f"https://login.microsoftonline.com/{TENANT}/v2.0",
+            auth_jwks_url="https://attacker.example/keys",
+        )

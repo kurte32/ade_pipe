@@ -97,6 +97,10 @@ class Settings(BaseSettings):
             problems.append("AUTH_MODE must be 'entra'")
         if not self.auth_issuer.startswith("https://login.microsoftonline.com/"):
             problems.append("AUTH_ISSUER must be the Entra v2 issuer")
+        # The JWKS host is the actual trust root (signing keys are fetched from it), so pin it too;
+        # a correct issuer string with a dev/attacker JWKS endpoint must not start (audit A1).
+        if not self.auth_jwks_url.startswith("https://login.microsoftonline.com/"):
+            problems.append("AUTH_JWKS_URL must be the Entra keys endpoint")
         if self.db_auth != "entra":
             problems.append("DB_AUTH must be 'entra' (managed identity)")
         if self.storage_mode != "azure":
