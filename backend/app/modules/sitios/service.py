@@ -63,6 +63,7 @@ def to_detail(s: Sitio, claims: Claims) -> SitioDetail:
         fecha_origen_utc=s.fecha_origen_utc,
         devolucion_motivo=s.devolucion_motivo,
         devolucion_comentario=s.devolucion_comentario,
+        revision_detalle=s.revision_detalle,
         contacto=s.contacto,
         visita=s.visita,
         archivos=[

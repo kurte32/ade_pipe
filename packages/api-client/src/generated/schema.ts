@@ -988,6 +988,8 @@ export interface components {
             devolucion_motivo?: string | null;
             /** Devolucion Comentario */
             devolucion_comentario?: string | null;
+            /** Revision Detalle */
+            revision_detalle?: string | null;
             contacto?: components["schemas"]["ContactoOut"] | null;
             visita?: components["schemas"]["VisitaOut"] | null;
             /**

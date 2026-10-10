@@ -3171,6 +3171,17 @@
             ],
             "title": "Devolucion Comentario"
           },
+          "revision_detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Detalle"
+          },
           "contacto": {
             "anyOf": [
               {

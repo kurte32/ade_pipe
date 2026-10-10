@@ -9,7 +9,11 @@ const proxy = {
   "/dev-idp": { target: idpTarget, changeOrigin: true, rewrite: (p: string) => p.replace(/^\/dev-idp/, "") },
 };
 
+// Front Door routes /admin/* to this app in Azure; local dev serves at /.
+const base = process.env.VITE_BASE_PATH ?? "/";
+
 export default defineConfig({
+  base,
   plugins: [react()],
   server: { host: true, proxy },
   preview: { proxy },

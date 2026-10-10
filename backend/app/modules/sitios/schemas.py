@@ -65,6 +65,7 @@ class SitioDetail(SitioListItem):
     fecha_origen_utc: datetime
     devolucion_motivo: str | None = None
     devolucion_comentario: str | None = None
+    revision_detalle: str | None = None
     contacto: ContactoOut | None = None
     visita: VisitaOut | None = None
     archivos: list[ArchivoOut] = []
