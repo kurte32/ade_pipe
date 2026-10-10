@@ -103,6 +103,7 @@ module keyvault 'modules/keyvault.bicep' = {
     peSubnetId: network.outputs.peSubnetId
     vaultDnsZoneId: network.outputs.vaultDnsZoneId
     apiIdentityPrincipalId: identity.outputs.apiIdentityPrincipalId
+    migrationIdentityPrincipalId: identity.outputs.migrationIdentityPrincipalId
     privateNetworking: privateNetworking
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
   }
@@ -187,6 +188,7 @@ module containerapps 'modules/containerapps.bicep' = {
     apiIdentityId: identity.outputs.apiIdentityId
     apiIdentityName: identity.outputs.apiIdentityName
     apiIdentityClientId: identity.outputs.apiIdentityClientId
+    enableDefenderScanning: enableDefenderScanning
     migrationIdentityId: identity.outputs.migrationIdentityId
     migrationIdentityClientId: identity.outputs.migrationIdentityClientId
     acrLoginServer: acr.outputs.loginServer

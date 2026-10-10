@@ -137,10 +137,13 @@ jobs:
       image_digest: ${{ needs.build.outputs.digest }}
     secrets: inherit
 
+  # Depend only on build and guard with a status function: depending on deploy-dev caused a
+  # cascade-skip on release tags (deploy-dev is skipped there), so test/prod deployed nothing
+  # (audit D-05). Promotion order to prod is enforced by the prod environment's required reviewers.
   deploy-test:
     name: Deploy test (UAT)
-    needs: [build, deploy-dev]
-    if: ${{ startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.target == 'test') }}
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' && (startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.target == 'test')) }}
     uses: ./.github/workflows/deploy-environment.yml
     with:
       environment: test
@@ -149,8 +152,8 @@ jobs:
 
   deploy-prod:
     name: Deploy prod
-    needs: [build, deploy-test]
-    if: ${{ startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.target == 'prod') }}
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' && (startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.target == 'prod')) }}
     uses: ./.github/workflows/deploy-environment.yml
     with:
       environment: prod

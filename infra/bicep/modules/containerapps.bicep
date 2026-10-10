@@ -11,6 +11,8 @@ param workspaceId string
 param apiIdentityId string
 param apiIdentityName string
 param apiIdentityClientId string
+@description('When false, SCAN_MODE falls back to none so uploads are not left waiting for scan tags that are never written (audit D-08).')
+param enableDefenderScanning bool = true
 param migrationIdentityId string
 param migrationIdentityClientId string
 param acrLoginServer string
@@ -74,7 +76,7 @@ var commonEnv = [
   { name: 'STORAGE_DOCUMENTS_ACCOUNT_URL', value: documentsBlobEndpoint }
   { name: 'STORAGE_STAGING_CONTAINER', value: stagingContainer }
   { name: 'STORAGE_DOCUMENTS_CONTAINER', value: documentsContainer }
-  { name: 'SCAN_MODE', value: 'defender' }
+  { name: 'SCAN_MODE', value: enableDefenderScanning ? 'defender' : 'none' }
   { name: 'NOTIFY_MODE', value: 'graph' }
   { name: 'DIRECTORY_MODE', value: 'graph' }
   { name: 'GRAPH_BASE_URL', value: graphBaseUrl }

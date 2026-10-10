@@ -7,6 +7,8 @@ param tags object
 param peSubnetId string
 param vaultDnsZoneId string
 param apiIdentityPrincipalId string
+@description('Principal id of the migration job identity; it reads the same App Insights KV secret.')
+param migrationIdentityPrincipalId string
 param privateNetworking bool = true
 @secure()
 param appInsightsConnectionString string
@@ -50,6 +52,18 @@ resource apiSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     roleDefinitionId: secretsUserRoleId
     principalId: apiIdentityPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// The migrate job is passed the App Insights KV secret under its own identity (containerapps.bicep),
+// so it needs Secrets User too, or every environment's deploy fails at the migration step (audit D-02).
+resource migrationSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(vault.id, migrationIdentityPrincipalId, secretsUserRoleId)
+  scope: vault
+  properties: {
+    roleDefinitionId: secretsUserRoleId
+    principalId: migrationIdentityPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
