@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := help
+.PHONY: help up up-web down reset ps logs health db-migrate db-seed db-shell test test-unit lint dev e2e bicep-lint openapi
 SHELL := /bin/bash
 COMPOSE := docker compose
 API_RUN := $(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e HOME=/tmp -e DB_HOST=sqlserver -e STORAGE_BLOB_ENDPOINT=http://azurite:10000/devstoreaccount1 -e DEV_IDP_URL=http://dev-idp:8001 api
