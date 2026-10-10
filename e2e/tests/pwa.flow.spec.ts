@@ -110,7 +110,7 @@ test.describe("HU-06 a HU-12: flujo del coordinador", () => {
     await devolverComoAdmin(id, "sitio_prospectado", "Datos de contacto incompletos (prueba e2e)");
 
     await context.setOffline(false);
-    await page.getByTestId("sync-now").or(page.getByText("Sincronizar ahora")).first().click().catch(() => undefined);
+    // reloading mounts the sync provider, which syncs on start when online
     await page.goto(`${PWA_URL}/sitios/${id}`);
     await expect(page.getByTestId("conflict-panel")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("devuelto-banner")).toContainText("Devuelto por el administrador");
@@ -118,9 +118,9 @@ test.describe("HU-06 a HU-12: flujo del coordinador", () => {
     // the server is still in sitio_prospectado: the stale transition was not applied
     expect((await detalle("ard", id)).estatus).toBe("sitio_prospectado");
     // discard the local change; the chain is cleared
-    const discard = page.getByTestId("conflict-panel").getByRole("button", { name: "Descartar cambio local" });
-    while ((await discard.count()) > 0) await discard.first().click();
+    await page.getByTestId("conflict-panel").getByRole("button", { name: "Descartar cambio local" }).first().click();
     await expect(page.getByTestId("conflict-panel")).toBeHidden();
+    await expect(page.getByTestId("pending-badge")).toBeHidden();
     expect(errors.filter((e) => !/Failed to load resource|net::ERR|Failed to fetch/.test(e))).toEqual([]);
   });
 

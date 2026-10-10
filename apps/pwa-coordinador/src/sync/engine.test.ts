@@ -70,6 +70,8 @@ class FakeApi implements Api {
         if (this.failTransitionOnce && this.failTransitionOnce.sitioId === sitioId) {
           const err = this.failTransitionOnce.error;
           this.failTransitionOnce = null;
+          // a real server answers the next GET with the same state it reported in `current`
+          if (err instanceof ApiError && err.current) this.returned.set(sitioId, err.current as SitioDetail);
           throw err;
         }
         if (!opts.ifMatch) throw new ApiError(428, { type: "x/precondition-required", title: "If-Match", status: 428, detail: "" }, "428");
@@ -171,6 +173,7 @@ describe("sync engine", () => {
         "412",
       ),
     };
+    api.etags.set(1, 9); // the server really is at the version reported in `current`
     const out = await syncAll(deps);
     expect(out.blocked).toBe(1);
     expect(out.sent).toBe(1); // site 2 contacto went through

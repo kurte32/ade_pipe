@@ -250,6 +250,17 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
         }
         if (r.kind === "blocked") {
           outcome.blocked += 1;
+          // Show the server's state next to the blocked change, even when the rejection was a
+          // business rule (422) rather than a precondition (412).
+          try {
+            const current = await refreshSitio(deps, sitioId);
+            const stored = await db.operaciones.get(op.id);
+            if (current && stored && !stored.conflict) {
+              await db.operaciones.update(op.id, { conflict: current });
+            }
+          } catch {
+            /* offline while refreshing: the panel still shows the message */
+          }
           break; // stop this chain only
         }
         if (r.kind === "error") {

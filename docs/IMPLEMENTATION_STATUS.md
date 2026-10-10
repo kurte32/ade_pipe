@@ -18,11 +18,11 @@ Updated: 2026-10-10 (wave 1: backend modules, infra). Statuses: `not started` ·
 | RF-02 | Coordinator lists and views only assigned sites | in progress | API and DB isolation tested locally (`tests/integration/test_identity_and_rls.py`, pooled connections). PWA pending |
 | RF-03 | One-step status advance with minimum requirements | in progress | Backend tested locally (rules in code, If-Match 412/428, idempotent replay); PWA pending |
 | RF-04 | Capture contact, measurements with photos, required documents | in progress | Backend endpoints tested locally; PWA pending |
-| RF-05 | Admin bulk load CSV/XLSX/XLS with preview, warnings, approval | in progress | Backend tested locally with the 87-row synthetic file (parser, 38 rule tests, confirm, reload semantics); admin UI pending |
-| RF-06 | Admin returns a site to an earlier status with mandatory reason | in progress | Backend tested locally (history, outbox, coordinator sees devuelto); admin UI pending |
+| RF-05 | Admin bulk load CSV/XLSX/XLS with preview, warnings, approval | tested locally | Backend (parser, 38 rule tests, confirm, reload) and admin UI (Playwright `admin.cargas.spec.ts`: CSV with error and warnings, approve, confirm, new site searchable; invalid file 422) |
+| RF-06 | Admin returns a site to an earlier status with mandatory reason | tested locally | Backend tests plus Playwright `admin.sitios.spec.ts` (devolver with motivo and comentario, historial row, stale ETag conflict message) |
 | RF-07 | Teams notification on return | in progress | Outbox and job tested locally in log mode; Graph activity-feed delivery implemented, unverified (needs tenant) |
 | RF-08 | Chunked resumable PDF upload, validation, storage | in progress | Backend tested locally (3-part resumable upload, sha256, signature, pages, encrypted PDF, Range download); PWA uploader pending; Defender scan unverified |
-| RF-09 | Admin manages user→email equivalences and reassignment | in progress | Backend tested locally (dev directory); Graph directory unverified; admin UI pending |
+| RF-09 | Admin manages user→email equivalences and reassignment | tested locally | Playwright `admin.equivalencias.spec.ts` (unknown email rejected per code, valid saved) and reasignar flow; Graph directory unverified |
 | RF-10 | Immutable audit log | tested locally | Ledger tables, INSERT-only grants, audit on every write and download, admin viewer endpoint tested |
 | RF-11 | 5-year retention and audited purge | in progress | Purge job tested locally (metadata kept, 410 on download, audit as Sistema); Azure immutability policy statically validated only; start event is TDD pendiente 7 |
 | RNF-01 | Isolation at API, service, DB; encryption; no secrets in code | in progress | RLS filter and block predicates on 7 tables, app role without DDL or policy rights, tested locally |
@@ -38,11 +38,11 @@ Updated: 2026-10-10 (wave 1: backend modules, infra). Statuses: `not started` ·
 
 | HU | Story | Status | Evidence |
 |---|---|---|---|
-| HU-01 | Sign in with corporate account | in progress | Backend done and tested; frontends pending |
+| HU-01 | Sign in with corporate account | in progress | Dev issuer sign-in tested in Playwright (PWA and admin); MSAL provider written and type-checked, unverified against a tenant |
 | HU-02 | See only my sites | in progress | Backend done and tested; PWA pending |
-| HU-03 | Load CSV/XLSX/XLS and preview | in progress | Backend tested; admin UI pending |
-| HU-04 | Approve or exclude doubtful rows | in progress | Backend tested; admin UI pending |
-| HU-05 | Manage equivalences | in progress | Backend tested; admin UI pending |
+| HU-03 | Load CSV/XLSX/XLS and preview | tested locally | Playwright `admin.cargas.spec.ts` |
+| HU-04 | Approve or exclude doubtful rows | tested locally | Playwright `admin.cargas.spec.ts` |
+| HU-05 | Manage equivalences | tested locally | Playwright `admin.equivalencias.spec.ts` |
 | HU-06 | Site detail | in progress | Backend tested; PWA pending |
 | HU-07 | Capture contact, advance to Dueño Localizado | in progress | Backend tested; PWA pending |
 | HU-08 | Capture measurements, advance to Primera visita | in progress | Backend tested; PWA pending |
@@ -50,9 +50,9 @@ Updated: 2026-10-10 (wave 1: backend modules, infra). Statuses: `not started` ·
 | HU-10 | Work offline, auto sync | not started | |
 | HU-11 | Resume interrupted upload | in progress | Backend tested (lost part, resume state); PWA pending |
 | HU-12 | Upload photos | in progress | Backend tested; PWA pending |
-| HU-13 | Admin return with reason | in progress | Backend tested; admin UI pending |
+| HU-13 | Admin return with reason | tested locally | Playwright `admin.sitios.spec.ts` |
 | HU-14 | Teams notice on return | in progress | Outbox + in-app notice backend tested; Teams delivery unverified |
-| HU-15 | Audit log viewer | in progress | Backend tested; admin UI pending |
+| HU-15 | Audit log viewer | tested locally | Playwright `admin.auditoria.spec.ts` (filter by action, detail JSON) |
 | HU-16 | Documents in Fabric with metadata | in progress | Metadata and documents container path tested locally; OneLake shortcut and Mirroring statically validated only |
 | HU-17 | Purge after 5 years | in progress | Job tested locally; immutability and legal hold unverified |
 | HU-18 | Pen test and RLS tests before production | not started | |

@@ -35,6 +35,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const inFlight = useRef<Promise<SyncOutcome | null> | null>(null);
+  const rerun = useRef(false);
 
   const pendingCount = useLiveQuery(
     () => db.operaciones.where("estado").anyOf(["pendiente", "enviando", "error"]).count(),
@@ -49,24 +50,35 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   const syncNow = useCallback(async (): Promise<SyncOutcome | null> => {
     if (!account) return null;
-    if (inFlight.current) return inFlight.current;
+    if (inFlight.current) {
+      // Something was enqueued while a sync is running: run once more when it finishes.
+      rerun.current = true;
+      return inFlight.current;
+    }
     setSyncing(true);
-    const p = (async () => {
-      try {
-        const outcome = await syncAll(deps);
-        setLastOutcome(outcome);
-        setNeedsLogin(outcome.needsLogin);
-        setLastError(null);
-        if (!outcome.offline && !outcome.needsLogin) setLastSyncAt(Date.now());
-        return outcome;
-      } catch (e) {
-        setLastError(e instanceof Error ? e.message : String(e));
-        return null;
-      } finally {
-        setSyncing(false);
-        inFlight.current = null;
-      }
-    })();
+    const run = async (): Promise<SyncOutcome | null> => {
+      let last: SyncOutcome | null = null;
+      do {
+        rerun.current = false;
+        try {
+          const outcome = await syncAll(deps);
+          last = outcome;
+          setLastOutcome(outcome);
+          setNeedsLogin(outcome.needsLogin);
+          setLastError(null);
+          if (!outcome.offline && !outcome.needsLogin) setLastSyncAt(Date.now());
+          if (outcome.offline || outcome.needsLogin) rerun.current = false;
+        } catch (e) {
+          setLastError(e instanceof Error ? e.message : String(e));
+          rerun.current = false;
+        }
+      } while (rerun.current);
+      return last;
+    };
+    const p = run().finally(() => {
+      setSyncing(false);
+      inFlight.current = null;
+    });
     inFlight.current = p;
     return p;
   }, [account, deps]);
