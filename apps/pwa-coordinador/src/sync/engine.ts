@@ -204,7 +204,7 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
     await db.operaciones.update(op.id, { estado: "error", error: `${e.message} (${e.status})` });
     return { kind: "error" };
   }
-  await db.operaciones.update(db && op.id, { estado: "error", error: e instanceof Error ? e.message : String(e) });
+  await db.operaciones.update(op.id, { estado: "error", error: e instanceof Error ? e.message : String(e) });
   return { kind: "error" };
 }
 

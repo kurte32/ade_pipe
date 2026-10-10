@@ -75,7 +75,11 @@ Runs daily. Review `SELECT COUNT(*) FROM sitio_archivo WHERE estado = 'purgado' 
 Azure: point-in-time restore of the Azure SQL database to a new database name, then swap the connection (Container App secret or Key Vault reference) and redeploy. Ledger tables keep their digests; verify with `sys.sp_verify_database_ledger` after restore. Local: `make reset && make up && make db-seed`.
 
 ### RB-09 Rolling back a release
-Container Apps keeps the previous revision. `az containerapp revision activate --revision <previous>` then shift traffic 100 % to it. Migrations are expand-and-contract, so the previous revision runs against the new schema. Never run `alembic downgrade` in production without a restore point.
+The container app runs in multiple-revision mode and keeps the previous revision active.
+`az containerapp ingress traffic set -g <rg> -n ca-pipeline-api-<env> --revision-weight <previous>=100`
+moves all traffic back within seconds. Migrations are expand-and-contract, so the previous
+revision runs against the new schema. Never run `alembic downgrade` in production without a
+restore point. If the previous revision is gone, redeploy its image digest through `build-deploy`.
 
 ### RB-10 Rotating the dev identity provider key (local only)
 `docker compose down && docker volume rm ade-pipeline_devidpkeys && make up`. Everyone signs in again.

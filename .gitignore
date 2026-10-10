@@ -3,6 +3,7 @@ node_modules/
 __pycache__/
 .env
 .env.*
+!apps/*/.env.development
 *.log
 dist/
 spikes/**/local.settings.json

@@ -154,11 +154,14 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
     managedEnvironmentId: managedEnv.id
     workloadProfileName: profileName
     configuration: {
-      activeRevisionsMode: 'Single'
+      activeRevisionsMode: 'Multiple'
       maxInactiveRevisions: 5
       ingress: {
         external: true
         targetPort: 8000
+        traffic: [
+          { latestRevision: true, weight: 100 }
+        ]
         transport: 'auto'
         allowInsecure: false
         ipSecurityRestrictions: internalIngress ? [] : ipRestrictions

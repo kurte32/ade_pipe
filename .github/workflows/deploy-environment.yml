@@ -124,8 +124,21 @@ jobs:
           done
           echo "smoke test failed, last status $CODE"; cat /tmp/me.json || true; exit 1
 
+      - name: Keep only the current and the previous revision
+        run: |
+          revs=$(az containerapp revision list -g "$RG" -n "ca-pipeline-api-$ENV" \
+            --query "sort_by([?properties.active], &properties.createdTime)[].name" -o tsv)
+          count=$(printf '%s\n' "$revs" | grep -c . || true)
+          if [ "$count" -gt 2 ]; then
+            printf '%s\n' "$revs" | head -n $((count - 2)) | while read -r r; do
+              az containerapp revision deactivate -g "$RG" -n "ca-pipeline-api-$ENV" --revision "$r"
+            done
+          fi
+
       - name: Rollback hint on failure
         if: failure()
         run: |
-          echo "Deployment failed. To roll back, re-run build-deploy with workflow_dispatch, target=$ENV and the previous image digest"
-          echo "(see 'Record current revision' above). Database migrations are expand/contract; do not downgrade automatically."
+          echo "Deployment failed. Traffic shift rollback (multiple-revision mode):"
+          echo "  az containerapp ingress traffic set -g $RG -n ca-pipeline-api-$ENV --revision-weight <previous-revision>=100"
+          echo "The previous revision is listed by 'Record current revision' above and stays active."
+          echo "Database migrations are expand/contract; do not downgrade automatically."

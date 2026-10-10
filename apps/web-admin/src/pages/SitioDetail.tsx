@@ -111,7 +111,7 @@ export function SitioDetailPage() {
           {s.en_revision_admin ? (
             <>
               <dt>Revisión</dt>
-              <dd>{s.revision_detalle ?? "Pendiente de decisión del administrador"}</dd>
+              <dd>Pendiente de decisión del administrador (reasignar, devolver o descartar).</dd>
             </>
           ) : null}
         </dl>

@@ -6,8 +6,9 @@ name: build-deploy
 #   vars:    ACR_NAME, RESOURCE_GROUP, VITE_TENANT_ID, VITE_SPA_CLIENT_ID_PWA, VITE_SPA_CLIENT_ID_ADMIN,
 #            VITE_API_CLIENT_ID, PUBLIC_HOST (Front Door or SWA host used for the smoke test)
 #   environments test and prod: required reviewers (release gate).
-# Rollback: re-run this workflow with workflow_dispatch and the previous image digest; the same
-# deployment steps redeploy that digest (single-revision mode, see docs/AZURE_DEPLOYMENT.md).
+# Rollback: the container app runs in multiple-revision mode; shift traffic back to the previous
+# revision with `az containerapp ingress traffic set` (see docs/AZURE_DEPLOYMENT.md section 9).
+# Re-running this workflow with a previous image digest is the fallback when the revision is gone.
 
 on:
   push:

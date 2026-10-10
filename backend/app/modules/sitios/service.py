@@ -125,7 +125,18 @@ def delta(
     (reassigned or no longer vigente). RLS hides reassigned sites, so the client must send its
     known ids to learn what to delete.
     """
-    max_rv = session.execute(text("SELECT CONVERT(varchar(16), @@DBTS, 2)")).scalar() or "0" * 16
+    # Watermark: one below the lowest rowversion still held by an open transaction, so changes
+    # that commit after this read are picked up by the next delta (MIN_ACTIVE_ROWVERSION is
+    # @@DBTS + 1 when nothing is in flight).
+    max_rv = (
+        session.execute(
+            text(
+                "SELECT CONVERT(varchar(16), CONVERT(binary(8), "
+                "CONVERT(bigint, MIN_ACTIVE_ROWVERSION()) - 1), 2)"
+            )
+        ).scalar()
+        or "0" * 16
+    )
     stmt = (
         select(Sitio)
         .options(

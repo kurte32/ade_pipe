@@ -168,9 +168,13 @@ Update `appPublicUrl` in the parameter file once the host is known; it is used i
 
 ## 9. Rollback
 
-- **API**: re-run `build-deploy` with `workflow_dispatch`, `target=<env>`, `image_digest=<previous
-  digest>` (printed by the "Record current revision" step of every deployment). The app runs in
-  single-revision mode, so the redeploy replaces the revision within a minute.
+- **API**: the container app runs in multiple-revision mode with traffic on the latest revision;
+  each deployment keeps the previous revision active. Roll back with
+  `az containerapp ingress traffic set -g <rg> -n ca-pipeline-api-<env> --revision-weight <previous>=100`
+  (revision names are printed by the "Record current revision" step). Migrations are
+  expand-and-contract, so the previous revision runs against the new schema. If the previous
+  revision was deactivated, re-run `build-deploy` with `workflow_dispatch`, `target=<env>` and
+  `image_digest=<previous digest>`.
 - **Infrastructure**: revert the Bicep or parameter change and redeploy; `what-if` shows the reverse delta first.
 - **Database**: never downgrade in production automatically. If a migration must be reverted, run a
   manual `alembic downgrade <rev>` through the migration job with an overridden command, after a
