@@ -156,3 +156,12 @@ def test_app_user_cannot_touch_ledger_or_policy() -> None:
             s.execute(text("ALTER SECURITY POLICY rls.coordinador_policy WITH (STATE = OFF)"))
         s.rollback()
         clear_session_context(s)
+
+
+def test_delta_large_known_list_does_not_exceed_param_limit(client, coord_a_headers) -> None:  # type: ignore[no-untyped-def]
+    """2500 known ids must not 500 on SQL Server's 2100-parameter cap (audit B-03)."""
+    ids = ",".join(str(i) for i in range(900000, 902500))  # none of these exist
+    r = client.get(f"/api/v1/sitios/delta?conocidos={ids}", headers=coord_a_headers)
+    assert r.status_code == 200, r.text
+    # every known-but-invisible id comes back as removed, chunked under the parameter limit
+    assert len(r.json()["removed_ids"]) == 2500

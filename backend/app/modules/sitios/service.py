@@ -13,6 +13,8 @@ from app.modules.sitios.schemas import ArchivoOut, SitioDetail, SitioListItem, S
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
+# Keep IN-list chunks well under SQL Server's 2100-parameter statement limit (audit B-03).
+_ID_CHUNK = 1000
 
 
 def etag_of(sitio: Sitio) -> str:
@@ -154,11 +156,16 @@ def delta(
     rows = list(session.execute(stmt.order_by(Sitio.id)).scalars())
     removed: list[int] = []
     if known_ids:
-        visible = set(
-            session.execute(
-                select(Sitio.id).where(Sitio.id.in_(known_ids), Sitio.vigente == true())
-            ).scalars()
-        )
+        # Chunk the IN list: SQL Server caps a statement at 2100 parameters, so a coordinator whose
+        # offline cache exceeds ~2100 sites would otherwise 500 on every delta sync (audit B-03).
+        visible: set[int] = set()
+        for start in range(0, len(known_ids), _ID_CHUNK):
+            chunk = known_ids[start : start + _ID_CHUNK]
+            visible.update(
+                session.execute(
+                    select(Sitio.id).where(Sitio.id.in_(chunk), Sitio.vigente == true())
+                ).scalars()
+            )
         removed = sorted(set(known_ids) - visible)
     return {
         "items": [to_detail(s, claims) for s in rows],
