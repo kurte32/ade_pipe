@@ -146,6 +146,23 @@ describe("sync engine", () => {
     expect((await db.sitios.get(1))?.detail.estatus).toBe("dueno_localizado");
   });
 
+  it("keeps a transient 5xx retryable and drains it on the next sync (E-1)", async () => {
+    await enqueue(deps, 1, "transicion", { estatus_destino: "dueno_localizado", comentario: null });
+    api.failTransitionOnce = {
+      sitioId: 1,
+      error: new ApiError(503, { type: "x/unavailable", title: "no disponible", status: 503, detail: "" }, "503"),
+    };
+    let out = await syncAll(deps);
+    expect(out.offline).toBe(true); // transient server error, not a terminal error
+    const op = (await db.operaciones.where("sitioId").equals(1).toArray())[0];
+    expect(op?.estado).toBe("pendiente");
+    expect(op?.intentos).toBe(1);
+    // the server recovers; the next sync drains the op with no manual per-site retry
+    out = await syncAll(deps);
+    expect(out.sent).toBe(1);
+    expect(await db.operaciones.count()).toBe(0);
+  });
+
   it("sends an Idempotency-Key and reuses it after a network retry", async () => {
     await enqueue(deps, 1, "contacto", { nombre: "Ana", telefono: "2281234567", correo: null, notas: null });
     api.networkDown = true;

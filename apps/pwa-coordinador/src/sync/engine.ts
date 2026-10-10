@@ -6,7 +6,9 @@
  * - Every write carries an Idempotency-Key, so a retry after a lost response never duplicates.
  * - 412 / 422 / 404 / 409 block that operation and stop that site's chain; the server's current
  *   state (412 `current`) is stored for the conflict panel.
- * - Network failures keep operations `pendiente`. 401 or InteractionRequired flags "needs login".
+ * - Network failures and transient server errors (429, 5xx, timeouts) keep operations `pendiente`
+ *   and auto-retry on the next sync, capped at MAX_TRANSIENT_RETRIES before surfacing as `error`.
+ *   401 or InteractionRequired flags "needs login".
  * - Runs in the foreground only (the service worker cannot obtain tokens).
  */
 
@@ -26,6 +28,9 @@ import type {
   VisitaIn,
   VisitaResponse,
 } from "../lib/types";
+
+/** How many times a transient (429/5xx/timeout) failure is auto-retried before it surfaces (E-1). */
+export const MAX_TRANSIENT_RETRIES = 5;
 
 export const META_MAX_ROWVERSION = "sitios.maxRowversion";
 export const META_LAST_SYNC = "sync.lastAt";
@@ -200,6 +205,24 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
       await db.operaciones.update(op.id, { estado: "bloqueada", error: message, conflict: current, faltantes });
       if (current) await upsertSitio(db, current);
       return { kind: "blocked" };
+    }
+    // Transient server errors (429 and 5xx) are retryable. Behind a reverse proxy (Front Door ->
+    // Container Apps) a deploy, scale event or brief DB failover surfaces as a 5xx, not a
+    // NetworkError, so treating these as terminal would wedge the whole site chain with no
+    // auto-retry (audit E-1). Keep the op pending and let the next sync drain it, capping attempts
+    // so a genuinely poisoned request eventually surfaces for manual resolution.
+    if (e.status === 429 || e.status >= 500) {
+      const intentos = (op.intentos ?? 0) + 1;
+      if (intentos >= MAX_TRANSIENT_RETRIES) {
+        await db.operaciones.update(op.id, {
+          estado: "error",
+          intentos,
+          error: "No se pudo sincronizar tras varios intentos. Reintenta cuando la conexión sea estable.",
+        });
+        return { kind: "error" };
+      }
+      await db.operaciones.update(op.id, { estado: "pendiente", intentos });
+      return { kind: "offline" };
     }
     await db.operaciones.update(op.id, { estado: "error", error: `${e.message} (${e.status})` });
     return { kind: "error" };

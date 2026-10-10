@@ -16,7 +16,7 @@ export function MisSitios() {
     const m = new Map<number, { pending: number; blocked: number }>();
     for (const op of ops ?? []) {
       const e = m.get(op.sitioId) ?? { pending: 0, blocked: 0 };
-      if (op.estado === "bloqueada") e.blocked += 1;
+      if (op.estado === "bloqueada" || op.estado === "error") e.blocked += 1;
       else e.pending += 1;
       m.set(op.sitioId, e);
     }

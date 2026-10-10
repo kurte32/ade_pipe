@@ -24,6 +24,8 @@ export interface Operacion {
   createdAt: number;
   seq: number;
   estado: OperacionEstado;
+  /** Transient-failure (429/5xx/timeout) retry count; a terminal `error` is set once it caps out. */
+  intentos?: number;
   error?: string;
   /** Server state attached to a 412, shown in the conflict panel. */
   conflict?: SitioDetail | null;
