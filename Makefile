@@ -65,7 +65,7 @@ e2e-preview: ## Coordinator specs against the BUILT PWA (service worker active) 
 	cd apps/pwa-coordinador && VITE_ALLOW_DEV_AUTH=true pnpm exec vite build --mode development --outDir dist-preview --logLevel warn
 	cd apps/pwa-coordinador && (pnpm exec vite preview --outDir dist-preview --port 4173 --strictPort > /tmp/vite-preview.log 2>&1 & echo $$! > /tmp/vite-preview.pid)
 	sleep 4
-	PWA_URL=http://localhost:4173 pnpm --filter e2e exec playwright test tests/pwa.signin.spec.ts tests/pwa.a11y.spec.ts tests/pwa.flow.spec.ts --project=pwa-mobile; status=$$?; pkill -f '[v]ite preview --outDir dist-preview' 2>/dev/null; rm -f /tmp/vite-preview.pid; exit $$status
+	PWA_URL=http://localhost:4173 pnpm --filter e2e exec playwright test tests/pwa.signin.spec.ts tests/pwa.a11y.spec.ts tests/pwa.flow.spec.ts --project=pwa-mobile; status=$$?; pkill -f 'dist-preview --port [4]173' 2>/dev/null; rm -f /tmp/vite-preview.pid; exit $$status
 
 job-%: ## Run a background job once: make job-promote | job-outbox | job-purge
 	$(API_RUN) python -m app.jobs.run $*
