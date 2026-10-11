@@ -189,6 +189,7 @@ module containerapps 'modules/containerapps.bicep' = {
     apiIdentityName: identity.outputs.apiIdentityName
     apiIdentityClientId: identity.outputs.apiIdentityClientId
     enableDefenderScanning: enableDefenderScanning
+    trustedProxyHops: deployFrontDoor ? 2 : 1
     migrationIdentityId: identity.outputs.migrationIdentityId
     migrationIdentityClientId: identity.outputs.migrationIdentityClientId
     acrLoginServer: acr.outputs.loginServer

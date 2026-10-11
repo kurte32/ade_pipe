@@ -13,6 +13,10 @@ param apiIdentityName string
 param apiIdentityClientId string
 @description('When false, SCAN_MODE falls back to none so uploads are not left waiting for scan tags that are never written (audit D-08).')
 param enableDefenderScanning bool = true
+@description('Reverse proxies that append to X-Forwarded-For before the API: 1 = Container Apps ingress, 2 = Front Door + ingress. Needs confirmation in the test environment (Phase 3).')
+@minValue(0)
+@maxValue(3)
+param trustedProxyHops int = 2
 param migrationIdentityId string
 param migrationIdentityClientId string
 param acrLoginServer string
@@ -77,6 +81,7 @@ var commonEnv = [
   { name: 'STORAGE_STAGING_CONTAINER', value: stagingContainer }
   { name: 'STORAGE_DOCUMENTS_CONTAINER', value: documentsContainer }
   { name: 'SCAN_MODE', value: enableDefenderScanning ? 'defender' : 'none' }
+  { name: 'TRUSTED_PROXY_HOPS', value: string(trustedProxyHops) }
   { name: 'NOTIFY_MODE', value: 'graph' }
   { name: 'DIRECTORY_MODE', value: 'graph' }
   { name: 'GRAPH_BASE_URL', value: graphBaseUrl }

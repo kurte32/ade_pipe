@@ -7,4 +7,4 @@ python -m app.cli db-init
 echo "[dev-entrypoint] applying migrations"
 alembic upgrade head
 echo "[dev-entrypoint] starting API"
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-proxy-headers --reload --reload-dir app

@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     # Hard cap on any request body, enforced before the app reads it (audit B-05). Must exceed
     # load_max_bytes plus multipart overhead and upload_chunk_bytes.
     max_request_bytes: int = 12 * 1024 * 1024
+    # Number of reverse proxies in front of the API that append to X-Forwarded-For (Container Apps
+    # ingress = 1, plus Front Door = 2). 0 ignores the header and uses the socket peer (audit A5).
+    trusted_proxy_hops: int = 0
     duplicate_distance_meters: float = 15.0
     suspicious_name_words: str = "prueba,viable,equivocado,ubicacion,ubicación,test"
     upload_session_ttl_hours: int = 72
