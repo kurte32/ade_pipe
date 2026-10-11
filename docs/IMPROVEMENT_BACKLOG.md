@@ -45,7 +45,7 @@ depends on third parties).
 | FD | Front Door, WAF and Private Link origin approval; rate-limit rule verified under a burst | TI | P0 | M | AZURE_DEPLOYMENT §8 |
 | AZ-6 | Restrict the direct Static Web App hostnames to Front Door | Engineering | P1 | S | AZURE_DEPLOYMENT §6 |
 | AZ-4 | Confirm `TRUSTED_PROXY_HOPS` by comparing the ledger IP with the caller IP | Engineering | P1 | S | AZURE_DEPLOYMENT §4 |
-| OBS | App Insights wiring, dashboards and the alert set, each alert forced once | Engineering | P0 | M | OPERATIONS "Alerts to configure" |
+| OBS | App Insights wiring, dashboards; the four Bicep alert rules (`alertEmails`) forced once each and thresholds tuned | Engineering | P0 | M | OPERATIONS "Alerts to configure" |
 | RESTORE | Restore drill: PITR to a side database, repoint, ledger digest, RLS check, timed against the RTO | Engineering | P0 | M | OPERATIONS "Backup and recovery" |
 | PEN | Penetration test (book now, 2 to 4 weeks lead time) plus the RLS test report | Seguridad | P0 | XL | PRODUCTION_READINESS_PLAN Phase 4 |
 | 150MB | 150 MB resumable upload with a forced disconnect and a 150 MB download through Front Door on 4G | Engineering | P1 | S | DELIVERY_REPORT §6 |
@@ -66,7 +66,6 @@ depends on third parties).
 | B-04r | Bulk load: reject a 100k-row XLSX in under 2 s (today 4.8 s) | P2 | M | REMEDIATION_PLAN second pass |
 | D-03r | `/readyz` cannot read `alembic_version` with the app role; expose the applied revision another way (startup log or a grant on a view) | P2 | S | PRODUCTION_READINESS_PLAN progress |
 | LEDGER-DIGEST | Configure external ledger digest storage so `sp_verify_database_ledger` checks against an immutable copy | P2 | S | OPERATIONS RB-08 |
-| PURGE-ERR | Purge job treats any delete failure as "protected, skip"; distinguish a legal hold from a misconfiguration | P2 | S | DELIVERY_REPORT §9 |
 | SHA-STREAM | Streaming SHA-256 for large PDFs on the phone (today the file is hashed in memory) | P3 | M | DELIVERY_REPORT §10 item 7 |
 | XLS-REAL | Verify `.xls` parsing with a real legacy file from the business | P2 | S | DELIVERY_REPORT §9 |
 | UX-P12 | "Volver a descargar mis sitios" action for a diverged local cache (today: sign out) | P2 | S | ux/UX_VALIDATION §4 |
@@ -75,8 +74,6 @@ depends on third parties).
 | UX-CARGAS | Tidy the "Últimas cargas" rows at 390 px | P3 | S | ux/UX_VALIDATION §4 |
 | UX-AUDIT | Glossary tooltip for audit action codes | P3 | S | ux/UX_VALIDATION §4 |
 | UX-LOGO | Replace the re-created roundel with the official vector logo and a raster icon set for the manifest | P1 (Mercadotecnia) | S | ux/DESIGN_SYSTEM §1 |
-| HEALTH-DEPS | `/healthz/deps` (Admin only: Key Vault, JWKS, Graph reachability) as designed in PRODUCTION_READINESS §3 | P2 | S | PRODUCTION_READINESS §3 |
-| LOG-FIELDS | Add `duration_ms`, `revision`, `job_name`, `sitio_id`/`lote_id` where available, as designed in PRODUCTION_READINESS §2.1 | P2 | S | PRODUCTION_READINESS §2.1 |
 | SCHED | Local scheduler uses fixed intervals, Azure uses cron; document only (accepted) | P3 | — | DELIVERY_REPORT §9 |
 
 Observed in code during the documentation pass of 11 October 2026 (read, not reproduced), plus
@@ -87,15 +84,9 @@ what the engineering audit of the same day left open (`docs/audit/ENGINEERING_AU
 |---|---|---|---|---|
 | ENTREGADO | Status `entregado` is seeded as terminal but no code path assigns it; either add the admin action or drop it from the catalog once Negocio decides (pendiente Q5). Audit DAT-15 | P2 | S | `backend/app/models.py`, `transiciones/service.py` |
 | FE-10 | A contact or visit queued before a transition is sent unconditionally and its new ETag is recorded as "ours", so an admin change made in between is not surfaced as a 412 on the transition. Deliberate trade-off (offline devices rarely hold a fresh ETag; the backend now honours `If-Match` on captures when sent); decide whether captures should carry `etagBase` once the pilot shows how often admins change sites mid-capture | P3 | S | `apps/pwa-coordinador/src/sync/engine.ts` |
-| DAT-16 | Multi-range and unknown-unit `Range` headers answer 416 where RFC 9110 prefers 200 with the full body | P3 | S | `backend/app/modules/archivos/validation.py` |
 | DAT-17 | `neutralize()` prefixes `'` to cells starting with `= + - @` at load time (into staging originals); the TDD asks for neutralisation on export, and there is no export. Harmless today; revisit when an export exists | P3 | S | `backend/app/modules/cargas/validation.py` |
 | DAT-14b | Business tables use `datetime` (3.33 ms) while ledgers use `datetime2(3)`; a `datetime2` migration is a broad ALTER and was deferred | P3 | M | migration |
-| DAT-13b | Still unaudited writes: marking a notification read, the `escaneando` transition, outbox send outcomes | P3 | S | `notificaciones/service.py`, `archivos/service.py`, `jobs/outbox.py` |
-| IDN-6 | The app login can set `rol='Admin'` in session context itself; add a lint rule (ruff S608 or a grep) banning f-string `text()` in `app/modules` so static SQL stays the invariant | P3 | S | CI |
-| IDN-8 | No application-level or per-user rate limiting (Front Door WAF only, absent in dev); add a per-oid limiter on upload and bulk-load routes if the pilot shows abuse | P3 | M | `backend/app/core` |
-| COV | `pytest-cov` is not installed; no backend coverage figure. Vitest coverage not configured | P3 | S | `backend/pyproject.toml`, CI |
-| CI-IMAGES | CI service images (`mssql/server:2022-latest`, `azurite:latest`) are unpinned; pin once the tags are checked | P3 | S | `.github/workflows/ci.yml` |
-| TST-4b | The pooled-connection RLS test does not assert the same SPID is reused | P3 | S | `backend/tests/integration/test_identity_and_rls.py` |
+| DAT-13b | Still unaudited writes: marking a notification read and the `escaneando` transition (outbox outcomes are audited since 11 October) | P3 | S | `notificaciones/service.py`, `archivos/service.py`, `jobs/outbox.py` |
 | E2E-ENTRA | No automated acceptance run against an Entra-protected environment (Playwright signs in through the dev picker only) | P1 | M | `e2e/helpers/auth.ts` |
 
 ## 4. Product ideas (not in the TDD; need a business owner before any work)

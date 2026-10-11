@@ -99,4 +99,11 @@ Restore drill: documented in `architecture/PRODUCTION_READINESS.md` section 5; n
 
 ## Alerts to configure (Azure Monitor)
 
+Four of these are deployed by `infra/bicep/modules/monitoring.bicep` as scheduled query rules on
+the API's JSON logs once `alertEmails` is set in the parameter file (API 5xx rate, job failures,
+dead-lettered notifications, purge blocked by a legal hold); thresholds are first guesses to tune
+in the test environment. Logs carry `duration_ms`, `revision`, `sitio_id`/`lote_id`/`archivo_id`
+/`subida_id` from the route, and `job_name`/`job_run` on job lines. An administrator can call
+`GET /healthz/deps` for dependency reachability with latency.
+
 Readiness probe failures, HTTP 5xx rate above 1 % over 5 minutes, `promote` sessions waiting over `SCAN_WAIT_SECONDS`, outbox `fallida` count increasing, purge job failures, SQL DTU/vCore above 80 %, and any `unhandled_error` log event. Exact thresholds and routing are in `architecture/PRODUCTION_READINESS.md`.

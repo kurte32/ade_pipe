@@ -28,6 +28,13 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   a 412 reloads the site, config errors render a message.
 - API: captures honour `If-Match` when sent; identical reloads keep the site's ETag; chunked
   overflows answer 413 Problem Details; site ids are bounded; CHECK constraints and the missing FK.
+- Hardening round two: Front Door origin validation in the API (`FRONT_DOOR_ID`, required in
+  production); per-user rate limits per route family (429 with Retry-After); `/healthz/deps`
+  for administrators; `duration_ms`, entity ids, `revision` and `job_name` in logs; purge
+  distinguishes a retention block (403/409) from other failures; outbox outcomes audited; multi-
+  range and unknown-unit `Range` headers ignored instead of 416; the pooled-connection RLS test
+  asserts one connection; four Azure Monitor alert rules in Bicep; CI service images and the
+  compose stack pinned to SQL Server 2022 CU27 and Azurite 3.35.0; backend coverage gate (80 %).
 - Infrastructure and pipeline (static): admin SPA on its own Front Door host; dev SPA→API via
   CORS and `VITE_API_BASE_URL`; SQL firewall and NSG rules for dev; control-plane digest
   promotion; diagnostics for Front Door, Key Vault and storage; pinned base images; drift and

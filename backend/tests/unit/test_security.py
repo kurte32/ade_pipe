@@ -127,6 +127,7 @@ VALID_PRODUCTION: dict[str, Any] = {
     "auth_audience": AUD,
     "auth_allowed_azp": PWA,
     "auth_admin_azp": "44444444-4444-4444-8444-444444444444",
+    "front_door_id": "11111111-2222-4333-8444-555555555555",
     "auth_issuer": f"https://login.microsoftonline.com/{TENANT}/v2.0",
     "auth_jwks_url": f"https://login.microsoftonline.com/{TENANT}/discovery/v2.0/keys",
 }
@@ -152,6 +153,7 @@ def test_production_guard_accepts_a_valid_configuration() -> None:
         ("auth_allowed_azp", "", "AUTH_ALLOWED_AZP"),
         ("auth_admin_azp", "", "AUTH_ADMIN_AZP"),
         ("teams_app_id", "", "TEAMS_APP_ID"),
+        ("front_door_id", "", "FRONT_DOOR_ID"),
     ],
 )
 def test_production_guard_refuses_each_dev_setting(field: str, value: str, message: str) -> None:

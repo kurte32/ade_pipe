@@ -559,5 +559,6 @@ implemented statically and will be verified by the first real `build-deploy` run
 | Found during remediation: the new `avanzar` lock ran after the If-Match check, so a waiting request passed with the new version | fixed, caught by the TST-4 burst test | `caa1612` |
 | Found in review: the deployment guard required `TEAMS_APP_ID` while Bicep hardcoded `NOTIFY_MODE=graph`, so dev would have refused to start | fixed: `notifyMode` parameter, `log` in dev and test until the Teams app exists | final commit |
 | FE-10 | open by decision (captures stay unconditional unless the client sends If-Match) | backlog `FE-10` |
-| DAT-13 (mark-read, `escaneando`, send outcome), DAT-14 (`datetime2`), DAT-15, DAT-16, DAT-17, IDN-6, IDN-8, TST-4 (SPID), coverage tooling, CI service image pins | open, P3 | backlog §3 |
+| DAT-16, IDN-8, TST-4 (SPID), DAT-13 (send outcomes), coverage gate, CI image pins, plus backlog A3 (Front Door id), HEALTH-DEPS, LOG-FIELDS, PURGE-ERR, OBS alerts | fixed in the hardening round (commit after `b170511`) | see CHANGELOG |
+| DAT-13 (mark-read, `escaneando`), DAT-14 (`datetime2`), DAT-15, DAT-17, IDN-6 (lint rule: ruff S608 already enabled; kept as a note) | open, P3 | backlog §3 |
 | Azure verification of INF-1..4, CI-2..4; MSAL against a tenant; pen test; device test; screen-reader pass | needs the test environment | backlog §1–§2 |

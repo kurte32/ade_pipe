@@ -53,6 +53,8 @@ param swaSku string = 'Standard'
 param swaLocation string = 'eastus2'
 param logDailyCapGb int = 1
 param logRetentionDays int = 90
+@description('Recipients of the Azure Monitor alerts (backlog OBS). Empty: no action group or alert rules.')
+param alertEmails array = []
 
 // Storage policy
 param enableDefenderScanning bool = true
@@ -84,6 +86,7 @@ module network 'modules/network.bicep' = {
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring-${env}'
   params: {
+    alertEmails: alertEmails
     location: location
     env: env
     tags: tags
@@ -184,6 +187,18 @@ module swa 'modules/staticwebapps.bicep' = {
   }
 }
 
+// Profile and endpoints first: the API needs the profile id to validate X-Azure-FDID (backlog A3),
+// the routes need the API FQDN. Splitting the module breaks the cycle.
+module frontdoorProfile 'modules/frontdoor-profile.bicep' = {
+  name: 'frontdoor-profile-${env}'
+  params: {
+    env: env
+    tags: tags
+    enabled: deployFrontDoor
+    workspaceId: monitoring.outputs.workspaceId
+  }
+}
+
 module containerapps 'modules/containerapps.bicep' = {
   name: 'containerapps-${env}'
   params: {
@@ -227,6 +242,7 @@ module containerapps 'modules/containerapps.bicep' = {
     documentsBlobEndpoint: storage.outputs.documentsBlobEndpoint
     teamsAppId: teamsAppId
     notifyMode: notifyMode
+    frontDoorId: frontdoorProfile.outputs.frontDoorId
   }
 }
 
@@ -234,14 +250,15 @@ module frontdoor 'modules/frontdoor.bicep' = {
   name: 'frontdoor-${env}'
   params: {
     env: env
-    tags: tags
     location: location
     enabled: deployFrontDoor
+    profileName: frontdoorProfile.outputs.profileName
+    endpointName: frontdoorProfile.outputs.endpointName
+    adminEndpointName: frontdoorProfile.outputs.adminEndpointName
     pwaHostname: swa.outputs.pwaDefaultHostname
     adminHostname: swa.outputs.adminDefaultHostname
     apiFqdn: containerapps.outputs.apiFqdn
     managedEnvironmentId: containerapps.outputs.environmentId
-    workspaceId: monitoring.outputs.workspaceId
   }
 }
 
@@ -254,8 +271,8 @@ module fabricgateway 'modules/fabricgateway.bicep' = {
 }
 
 output apiFqdn string = containerapps.outputs.apiFqdn
-output frontDoorHostname string = frontdoor.outputs.endpointHostname
-output frontDoorAdminHostname string = frontdoor.outputs.adminEndpointHostname
+output frontDoorHostname string = frontdoorProfile.outputs.endpointHostname
+output frontDoorAdminHostname string = frontdoorProfile.outputs.adminEndpointHostname
 output pwaHostname string = swa.outputs.pwaDefaultHostname
 output adminHostname string = swa.outputs.adminDefaultHostname
 output acrLoginServer string = acr.outputs.loginServer

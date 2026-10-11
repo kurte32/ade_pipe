@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     auth_admin_azp: str = ""
     # SPA origins allowed by CORS. Empty behind Front Door (same origin); the SWA hosts without it.
     cors_allowed_origins: str = ""
+    # Front Door profile id: when set, /api/* requests must carry X-Azure-FDID with this value, so
+    # the origin restriction is not network-only (backlog A3). Empty = not behind Front Door.
+    front_door_id: str = ""
+    # Per-user request limits per minute (in-process, per replica). 0 disables a limit.
+    rate_limit_captures_per_minute: int = 300
+    rate_limit_transitions_per_minute: int = 300
+    rate_limit_uploads_per_minute: int = 120
+    rate_limit_upload_parts_per_minute: int = 1200
+    rate_limit_loads_per_minute: int = 30
     auth_issuer: str
     auth_jwks_url: str
     auth_required_scope: str = "access_as_user"
@@ -137,6 +146,8 @@ class Settings(BaseSettings):
         if self.notify_mode == "graph" and not self.teams_app_id:
             problems.append("TEAMS_APP_ID is required with NOTIFY_MODE='graph'")
         if self.environment == "production":
+            if not self.front_door_id:
+                problems.append("FRONT_DOOR_ID is required (origin validation, backlog A3)")
             if self.scan_mode != "defender":
                 problems.append("SCAN_MODE must be 'defender'")
             if self.notify_mode != "graph":

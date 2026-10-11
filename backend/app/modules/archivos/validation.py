@@ -111,7 +111,12 @@ def parse_range(header: str | None, size: int) -> tuple[int, int] | None:
     """Parse a single-range header into (start, end) inclusive. None when absent."""
     if not header:
         return None
-    m = _RANGE_RE.match(header.strip())
+    h = header.strip()
+    # RFC 9110 §14.2: a unit the server does not support, or several ranges, may be ignored (the
+    # full representation is returned); only a malformed or unsatisfiable single byte range is 416.
+    if not h.lower().startswith("bytes=") or "," in h:
+        return None
+    m = _RANGE_RE.match(h)
     if not m or size <= 0:
         raise _unsatisfiable(size)
     start_s, end_s = m.groups()

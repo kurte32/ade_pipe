@@ -11,8 +11,8 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.clock import to_utc_naive, utcnow
-from app.core.db import system_session
-from app.models import NotificacionOutbox
+from app.core.db import SYSTEM_OID, system_session
+from app.models import Auditoria, NotificacionOutbox
 from app.modules.notificaciones.graph import get_notifier
 
 log = structlog.get_logger()
@@ -76,6 +76,23 @@ def _claim(session: Session, now: datetime) -> list[int]:
     return ids
 
 
+def _audit(session: Session, row: NotificacionOutbox, accion: str) -> None:
+    """The delivery outcome is a write worth a ledger row (audit DAT-13); no body, no names."""
+    session.add(
+        Auditoria(
+            fecha_utc=to_utc_naive(utcnow()),
+            usuario_oid=SYSTEM_OID,
+            rol="Sistema",
+            accion=accion,
+            entidad="notificacion_outbox",
+            entidad_id=str(row.id),
+            ip=None,
+            correlation_id=None,
+            detalle=json.dumps({"sitio_id": row.sitio_id, "intentos": row.intentos}),
+        )
+    )
+
+
 def run() -> None:
     notifier = get_notifier()
     now = to_utc_naive(utcnow())
@@ -98,6 +115,7 @@ def run() -> None:
                 row.enviada_utc = to_utc_naive(utcnow())
                 row.ultimo_error = None
                 sent += 1
+                _audit(session, row, "notificacion_enviada")
             except Exception as exc:  # noqa: BLE001 - any delivery failure is retried
                 row.intentos += 1
                 row.ultimo_error = describe_error(exc)
@@ -105,4 +123,6 @@ def run() -> None:
                 row.siguiente_intento_utc = to_utc_naive(utcnow()) + backoff
                 row.estado = "fallida" if row.intentos >= MAX_ATTEMPTS else "pendiente"
                 failed += 1
+                if row.estado == "fallida":
+                    _audit(session, row, "notificacion_fallida")
     log.info("outbox_run", procesadas=len(ids), enviadas=sent, fallidas=failed)

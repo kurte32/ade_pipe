@@ -46,6 +46,8 @@ variable fails closed. Deployed non-production never trusts an unvalidated certi
 | `AUTH_AUDIENCE` | dev GUID | dev GUID | param `authAudience` (pipeline-api client id) |
 | `AUTH_ALLOWED_AZP` | two dev GUIDs | same | param `authAllowedAzp` |
 | `AUTH_ADMIN_AZP` | admin dev GUID | same | param `authAdminAzp`: Admin is honoured only from this client id, and that client never acts as Coordinador (required when deployed) |
+| `FRONT_DOOR_ID` | empty | empty | output of the Front Door profile; `/api/*` requests must carry a matching `X-Azure-FDID` (required in production, backlog A3) |
+| `RATE_LIMIT_*_PER_MINUTE` | defaults (300 captures, 300 transitions, 120 uploads, 1200 parts, 30 loads) | same | same; per user, per replica; 0 disables one |
 | `CORS_ALLOWED_ORIGINS` | empty | empty | empty behind Front Door; the two SWA hostnames when `deployFrontDoor=false` (dev), computed in `main.bicep` |
 | `AUTH_ISSUER` | `http://localhost:8001/<tenant>/v2.0` | same | `https://login.microsoftonline.com/<tenant>/v2.0` (computed) |
 | `AUTH_JWKS_URL` | dev-idp JWKS (compose overrides host) | `http://localhost:8001/...` | Entra discovery keys URL (computed) |

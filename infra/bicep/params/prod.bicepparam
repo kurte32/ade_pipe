@@ -37,3 +37,5 @@ param lockImmutabilityPolicy = false
 param environmentName = 'production'
 param logLevel = 'INFO'
 param appPublicUrl = 'https://pipeline-prod.azurefd.net'
+// Alert recipients (backlog OBS); empty until the support rota exists.
+param alertEmails = []

@@ -38,3 +38,5 @@ param lockImmutabilityPolicy = false
 param environmentName = 'test'
 param logLevel = 'INFO'
 param appPublicUrl = 'https://pipeline-test.azurefd.net'
+// Alert recipients (backlog OBS); empty until the support rota exists.
+param alertEmails = []

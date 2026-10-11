@@ -45,7 +45,7 @@ jobs:
         run: |
           docker run -d --name sqlserver -p 1433:1433 \
             -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e "MSSQL_SA_PASSWORD=${SQL_SA_PASSWORD}" \
-            mcr.microsoft.com/mssql/server:2022-latest
+            mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
           for _ in $(seq 1 60); do
             docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${SQL_SA_PASSWORD}" -C -Q "SELECT 1" >/dev/null 2>&1 && exit 0
             sleep 2
@@ -54,7 +54,7 @@ jobs:
 
       - name: Start Azurite
         run: |
-          docker run -d --name azurite -p 10000:10000 mcr.microsoft.com/azure-storage/azurite:latest \
+          docker run -d --name azurite -p 10000:10000 mcr.microsoft.com/azure-storage/azurite:3.35.0 \
             azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --skipApiVersionCheck
 
       - name: Start dev identity provider
@@ -102,7 +102,8 @@ jobs:
 
       - name: Unit and integration tests
         working-directory: backend
-        run: uv run pytest -q -p no:cacheprovider --junitxml=/tmp/pytest.xml
+        # Coverage floor (backlog COV): measured at 89 % on 2026-10-11; raise it, never lower it.
+        run: uv run pytest -q -p no:cacheprovider --junitxml=/tmp/pytest.xml --cov=app --cov-report=xml:/tmp/coverage.xml --cov-fail-under=80
 
       - name: Upload test report
         if: always()

@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core import idempotency
 from app.core.config import Settings, get_settings
 from app.core.errors import unprocessable
+from app.core.ratelimit import rate_limited
 from app.core.security import ROLE_ADMIN, ROLE_COORDINADOR, Claims, require_role
 from app.core.storage import BlobStore
 from app.deps import blob_store, client_ip, get_session, idempotency_key
@@ -46,6 +47,7 @@ def _uuid(value: str, what: str) -> uuid.UUID:
 def crear_subida(
     body: SubidaCreate,
     response: Response,
+    _limit: None = Depends(rate_limited("subidas", "rate_limit_uploads_per_minute")),
     claims: Claims = Depends(_coord),
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
@@ -81,6 +83,7 @@ async def subir_parte(
     subida_id: str,
     n: int,
     request: Request,
+    _limit: None = Depends(rate_limited("partes", "rate_limit_upload_parts_per_minute")),
     claims: Claims = Depends(_coord),
     session: Session = Depends(get_session),
     store: BlobStore = Depends(blob_store),

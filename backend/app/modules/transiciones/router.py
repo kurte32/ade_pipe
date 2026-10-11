@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core import idempotency
+from app.core.ratelimit import rate_limited
 from app.core.security import ROLE_ADMIN, ROLE_COORDINADOR, Claims, require_role
 from app.deps import SitioId, client_ip, get_session, idempotency_key, if_match
 from app.modules.sitios.schemas import SitioDetail
@@ -66,6 +67,7 @@ def _idempotent(
 def put_contacto(
     sitio_id: SitioId,
     data: ContactoIn,
+    _limit: None = Depends(rate_limited("capturas", "rate_limit_captures_per_minute")),
     claims: Claims = Depends(_coord),
     session: Session = Depends(get_session),
     key: str | None = Depends(idempotency_key),
@@ -86,6 +88,7 @@ def put_contacto(
 def put_visita(
     sitio_id: SitioId,
     data: VisitaIn,
+    _limit: None = Depends(rate_limited("capturas", "rate_limit_captures_per_minute")),
     claims: Claims = Depends(_coord),
     session: Session = Depends(get_session),
     key: str | None = Depends(idempotency_key),
@@ -106,6 +109,7 @@ def put_visita(
 def post_transicion(
     sitio_id: SitioId,
     data: TransicionIn,
+    _limit: None = Depends(rate_limited("transiciones", "rate_limit_transitions_per_minute")),
     claims: Claims = Depends(_coord),
     session: Session = Depends(get_session),
     key: str | None = Depends(idempotency_key),

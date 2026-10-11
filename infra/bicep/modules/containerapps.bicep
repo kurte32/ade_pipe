@@ -50,6 +50,8 @@ param authAllowedAzp string
 param authAdminAzp string
 @description('Comma-separated SPA origins allowed by CORS. Empty behind Front Door (same origin); the SWA hosts when there is no Front Door (dev, audit INF-2).')
 param corsAllowedOrigins string = ''
+@description('Front Door profile id; when set the API refuses /api/* requests without a matching X-Azure-FDID (backlog A3). Empty without Front Door.')
+param frontDoorId string = ''
 param stagingBlobEndpoint string
 param documentsBlobEndpoint string
 param stagingContainer string = 'staging'
@@ -84,6 +86,7 @@ var commonEnv = [
   { name: 'AUTH_ALLOWED_AZP', value: authAllowedAzp }
   { name: 'AUTH_ADMIN_AZP', value: authAdminAzp }
   { name: 'CORS_ALLOWED_ORIGINS', value: corsAllowedOrigins }
+  { name: 'FRONT_DOOR_ID', value: frontDoorId }
   { name: 'AUTH_ISSUER', value: authIssuer }
   { name: 'AUTH_JWKS_URL', value: authJwksUrl }
   { name: 'STORAGE_MODE', value: 'azure' }

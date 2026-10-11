@@ -32,11 +32,17 @@ def _purge_one(archivo_id: uuid.UUID, store: BlobStore, now: datetime) -> str:
         try:
             store.delete("documents", archivo.ruta_blob)
         except HttpResponseError as exc:
+            status = getattr(exc, "status_code", None)
+            if status not in (403, 409):
+                # Not a retention block (immutability policy or legal hold answer 409; a missing
+                # delete permission 403): a transient or configuration error, retried next run
+                # and visible as purge_failed in the alerts (backlog PURGE-ERR).
+                raise
             log.warning(
                 "purge_blocked",
                 archivo_id=str(archivo_id),
                 reason=type(exc).__name__,
-                status=getattr(exc, "status_code", None),
+                status=status,
             )
             # A legal hold or immutability policy stopping the purge is itself a retention event
             # that compliance must be able to see in the ledger (audit DAT-13).

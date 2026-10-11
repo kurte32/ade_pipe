@@ -105,9 +105,13 @@ def test_parse_range(header: str | None, size: int, expected: tuple[int, int] | 
     assert v.parse_range(header, size) == expected
 
 
-@pytest.mark.parametrize(
-    "header", ["bytes=100-", "bytes=50-10", "bytes=-0", "bytes=-", "items=0-1"]
-)
+@pytest.mark.parametrize("header", ["items=0-1", "bytes=0-1,5-6"])
+def test_parse_range_ignores_unknown_unit_and_multi_range(header: str) -> None:
+    """RFC 9110: ignore what we do not support and send the full body (audit DAT-16)."""
+    assert v.parse_range(header, 100) is None
+
+
+@pytest.mark.parametrize("header", ["bytes=100-", "bytes=50-10", "bytes=-0", "bytes=-"])
 def test_parse_range_unsatisfiable(header: str) -> None:
     with pytest.raises(AppError) as e:
         v.parse_range(header, 100)

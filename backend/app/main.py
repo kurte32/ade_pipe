@@ -6,15 +6,17 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.db import get_engine
+from app.core.edge import FrontDoorMiddleware
 from app.core.errors import register_error_handlers
 from app.core.limits import BodyLimitMiddleware
 from app.core.logging import CorrelationMiddleware, configure_logging
+from app.core.security import ROLE_ADMIN, Claims, require_role
 from app.core.storage import get_blob_store
 from app.core.telemetry import configure_telemetry
 
@@ -59,6 +61,8 @@ def create_app() -> FastAPI:
             expose_headers=["etag", "x-correlation-id", "content-disposition"],
             max_age=600,
         )
+    if settings.front_door_id:
+        app.add_middleware(FrontDoorMiddleware, front_door_id=settings.front_door_id)
     # Added last so it runs first: oversized bodies never reach the app (audit B-05).
     app.add_middleware(BodyLimitMiddleware, limit=settings.max_request_bytes)
     register_error_handlers(app)
@@ -93,6 +97,51 @@ def create_app() -> FastAPI:
 
             raise HTTPException(503, detail=checks)
         return checks
+
+    @app.get("/healthz/deps", tags=["health"], include_in_schema=False)
+    def healthz_deps(_: Claims = Depends(require_role(ROLE_ADMIN))) -> dict[str, object]:
+        """Dependency reachability for an administrator (backlog HEALTH-DEPS): database, storage,
+        the token signing keys and Microsoft Graph when it is in use. Never used by probes."""
+        import time
+
+        import httpx
+
+        out: dict[str, object] = {}
+
+        def timed(name: str, fn: object) -> None:
+            t = time.perf_counter()
+            try:
+                fn()  # type: ignore[operator]
+                out[name] = {"status": "ok", "ms": round((time.perf_counter() - t) * 1000)}
+            except Exception as exc:  # noqa: BLE001 - reported, never raised
+                out[name] = {"status": "error", "error": type(exc).__name__}
+
+        def db() -> None:
+            with get_engine().connect() as conn:
+                conn.execute(text("SELECT 1"))
+
+        def storage() -> None:
+            if not get_blob_store().ping():
+                raise RuntimeError("missing containers")
+
+        def jwks() -> None:
+            httpx.get(settings.auth_jwks_url, timeout=5).raise_for_status()
+
+        def graph() -> None:
+            httpx.get(f"{settings.graph_base_url}/$metadata", timeout=5).raise_for_status()
+
+        timed("database", db)
+        timed("storage", storage)
+        timed("jwks", jwks)
+        if settings.notify_mode == "graph" or settings.directory_mode == "graph":
+            timed("graph", graph)
+        else:
+            out["graph"] = {"status": "skipped", "reason": "not in use"}
+        checks = [v for v in out.values() if isinstance(v, dict)]
+        out["status"] = (
+            "ok" if all(v.get("status") in ("ok", "skipped") for v in checks) else "degraded"
+        )
+        return out
 
     _register_routers(app)
     return app

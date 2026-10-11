@@ -46,3 +46,5 @@ param logLevel = 'DEBUG'
 param appPublicUrl = 'https://swa-pipeline-pwa-dev.azurestaticapps.net'
 // No Teams app yet (backlog TEAMS): the in-app feed only. Switch to graph once teamsAppId is set.
 param notifyMode = 'log'
+// Alert recipients (backlog OBS); empty until the support rota exists.
+param alertEmails = []

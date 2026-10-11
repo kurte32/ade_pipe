@@ -7,7 +7,13 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from app.core.db import clear_session_context, session_factory, session_for, set_session_context
+from app.core.db import (
+    clear_session_context,
+    get_engine,
+    session_factory,
+    session_for,
+    set_session_context,
+)
 from app.core.security import Claims
 from tests.conftest import PWA_CLIENT_ID, auth, mint
 
@@ -120,13 +126,22 @@ def _claims(oid: uuid.UUID, role: str) -> Claims:
 def test_rls_on_pooled_connection(two_sites) -> None:  # type: ignore[no-untyped-def]
     q = text("SELECT id FROM sitio WHERE id IN (:a, :b)")
     params = {"a": two_sites["a"], "b": two_sites["b"]}
+    spids: list[int] = []
+    # Start from an empty pool so the three sequential sessions share one physical connection
+    # (the pool is FIFO: with several idle connections the test would rotate through them).
+    get_engine().dispose()
     # Same pool, sequential sessions: A, then B, then nobody.
     with session_for(_claims(two_sites["oid_a"], "Coordinador")) as s:
+        spids.append(int(s.execute(text("SELECT @@SPID")).scalar()))
         assert {r[0] for r in s.execute(q, params)} == {two_sites["a"]}
     with session_for(_claims(two_sites["oid_b"], "Coordinador")) as s:
+        spids.append(int(s.execute(text("SELECT @@SPID")).scalar()))
         assert {r[0] for r in s.execute(q, params)} == {two_sites["b"]}
     with session_factory()() as s:  # no context set: must see nothing
+        spids.append(int(s.execute(text("SELECT @@SPID")).scalar()))
         assert {r[0] for r in s.execute(q, params)} == set()
+    # The test only proves anything if the same physical connection served all three (TST-4).
+    assert len(set(spids)) == 1, spids
     with session_for(_claims(uuid.uuid4(), "Admin")) as s:
         assert {r[0] for r in s.execute(q, params)} == {two_sites["a"], two_sites["b"]}
 
