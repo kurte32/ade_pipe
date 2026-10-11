@@ -12,6 +12,7 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.errors import register_error_handlers
+from app.core.limits import BodyLimitMiddleware
 from app.core.logging import CorrelationMiddleware, configure_logging
 from app.core.storage import get_blob_store
 from app.core.telemetry import configure_telemetry
@@ -46,6 +47,8 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json" if settings.environment != "production" else None,
     )
     app.add_middleware(CorrelationMiddleware)
+    # Added last so it runs first: oversized bodies never reach the app (audit B-05).
+    app.add_middleware(BodyLimitMiddleware, limit=settings.max_request_bytes)
     register_error_handlers(app)
     configure_telemetry(app, settings)
 

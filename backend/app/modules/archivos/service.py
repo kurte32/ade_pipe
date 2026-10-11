@@ -151,13 +151,18 @@ def _require_open(subida: SubidaSesion) -> None:
         raise unprocessable("La sesión de subida expiró; inicia una nueva")
 
 
-def put_part(
-    session: Session, store: BlobStore, subida: SubidaSesion, n: int, data: bytes
-) -> list[int]:
+def expected_part_bytes(subida: SubidaSesion, n: int) -> int:
+    """Check the session is open and ``n`` in range; return the exact size part ``n`` needs."""
     _require_open(subida)
     if n < 0 or n >= subida.partes_total:
         raise unprocessable(f"Número de parte fuera de rango (0..{subida.partes_total - 1})")
-    expected = v.expected_part_size(n, subida.bytes_total, subida.tamano_parte, subida.partes_total)
+    return v.expected_part_size(n, subida.bytes_total, subida.tamano_parte, subida.partes_total)
+
+
+def put_part(
+    session: Session, store: BlobStore, subida: SubidaSesion, n: int, data: bytes
+) -> list[int]:
+    expected = expected_part_bytes(subida, n)
     if len(data) != expected:
         raise unprocessable(f"La parte {n} debe tener {expected} bytes y tiene {len(data)}")
     store.stage_block(subida.blob_staging, n, data)

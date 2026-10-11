@@ -355,3 +355,38 @@ def test_purge_job_keeps_metadata(client, coord_a_headers, two_sites) -> None:  
             )
         ).scalar_one()
         assert audit.rol == "Sistema"
+
+
+def test_oversized_part_rejected_before_reading(client, coord_a_headers, two_sites) -> None:  # type: ignore[no-untyped-def]
+    """A part larger than the session allows is refused by Content-Length, unread (audit B-05)."""
+    data = make_pdf(1)
+    r = _start(client, coord_a_headers, two_sites["a"], data)
+    assert r.status_code == 201, r.text
+    sid = r.json()["id"]
+    big = b"\0" * (5 * 1024 * 1024)
+    resp = client.put(
+        f"/api/v1/subidas/{sid}/partes/0",
+        content=big,
+        headers={**coord_a_headers, "Content-Type": "application/octet-stream"},
+    )
+    assert resp.status_code == 422, resp.text
+    assert "declara" in resp.json()["detail"]  # rejected on the declared length, before the body
+
+
+def test_oversized_streamed_part_aborted(client, coord_a_headers, two_sites) -> None:  # type: ignore[no-untyped-def]
+    """Without a Content-Length the stream is cut as soon as it overruns the part (audit B-05)."""
+    data = make_pdf(1)
+    r = _start(client, coord_a_headers, two_sites["a"], data)
+    sid = r.json()["id"]
+
+    def chunks():  # type: ignore[no-untyped-def]
+        for _ in range(64):
+            yield b"\0" * 65536
+
+    resp = client.put(
+        f"/api/v1/subidas/{sid}/partes/0",
+        content=chunks(),
+        headers={**coord_a_headers, "Content-Type": "application/octet-stream"},
+    )
+    assert resp.status_code == 422, resp.text
+    assert "excede" in resp.json()["detail"]

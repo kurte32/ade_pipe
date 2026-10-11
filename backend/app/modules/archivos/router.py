@@ -85,11 +85,22 @@ async def subir_parte(
     session: Session = Depends(get_session),
     store: BlobStore = Depends(blob_store),
 ) -> PartesOut:
-    data = await request.body()
     sid = _uuid(subida_id, "sesión")
+    subida = await run_in_threadpool(service.get_subida, session, sid)
+    expected = await run_in_threadpool(service.expected_part_bytes, subida, n)
+    # Never buffer more than the part can legally hold (audit B-05): reject a larger declared
+    # Content-Length before reading, and abort the stream as soon as it overruns.
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > expected:
+        raise unprocessable(f"La parte {n} debe tener {expected} bytes y declara {declared}")
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf.extend(chunk)
+        if len(buf) > expected:
+            raise unprocessable(f"La parte {n} debe tener {expected} bytes y excede ese tamaño")
+    data = bytes(buf)
 
     def _work() -> list[int]:
-        subida = service.get_subida(session, sid)
         return service.put_part(session, store, subida, n, data)
 
     return PartesOut(partes_recibidas=await run_in_threadpool(_work))

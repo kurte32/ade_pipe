@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     photo_max_bytes: int = 1_572_864
     load_max_rows: int = 5000
     load_max_bytes: int = 10 * 1024 * 1024
+    # Hard cap on any request body, enforced before the app reads it (audit B-05). Must exceed
+    # load_max_bytes plus multipart overhead and upload_chunk_bytes.
+    max_request_bytes: int = 12 * 1024 * 1024
     duplicate_distance_meters: float = 15.0
     suspicious_name_words: str = "prueba,viable,equivocado,ubicacion,ubicación,test"
     upload_session_ttl_hours: int = 72
