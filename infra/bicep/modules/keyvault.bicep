@@ -12,6 +12,8 @@ param migrationIdentityPrincipalId string
 param privateNetworking bool = true
 @secure()
 param appInsightsConnectionString string
+@description('Log Analytics workspace for AuditEvent logs (audit INF-4).')
+param workspaceId string = ''
 
 var kvName = 'kv-pipeline-${env}'
 // Key Vault Secrets User
@@ -33,6 +35,15 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
       defaultAction: privateNetworking ? 'Deny' : 'Allow'
       bypass: 'AzureServices'
     }
+  }
+}
+
+resource vaultDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!empty(workspaceId)) {
+  name: 'keyvault-to-log-analytics'
+  scope: vault
+  properties: {
+    workspaceId: workspaceId
+    logs: [{ category: 'AuditEvent', enabled: true }]
   }
 }
 

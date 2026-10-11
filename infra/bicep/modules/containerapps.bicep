@@ -48,6 +48,8 @@ param authAudience string
 param authAllowedAzp string
 @description('Client id of the admin SPA registration: Admin is honoured only from it.')
 param authAdminAzp string
+@description('Comma-separated SPA origins allowed by CORS. Empty behind Front Door (same origin); the SWA hosts when there is no Front Door (dev, audit INF-2).')
+param corsAllowedOrigins string = ''
 param stagingBlobEndpoint string
 param documentsBlobEndpoint string
 param stagingContainer string = 'staging'
@@ -78,6 +80,7 @@ var commonEnv = [
   { name: 'AUTH_AUDIENCE', value: authAudience }
   { name: 'AUTH_ALLOWED_AZP', value: authAllowedAzp }
   { name: 'AUTH_ADMIN_AZP', value: authAdminAzp }
+  { name: 'CORS_ALLOWED_ORIGINS', value: corsAllowedOrigins }
   { name: 'AUTH_ISSUER', value: authIssuer }
   { name: 'AUTH_JWKS_URL', value: authJwksUrl }
   { name: 'STORAGE_MODE', value: 'azure' }

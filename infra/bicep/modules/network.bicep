@@ -124,6 +124,21 @@ resource nsgAca 'Microsoft.Network/networkSecurityGroups@2023-11-01' = {
         }
       }
       {
+        // Azure SQL: 1433 plus the redirect port range (audit INF-2; a private endpoint is inside
+        // the VNet and already allowed by AllowVnetOutbound).
+        name: 'AllowSqlOutbound'
+        properties: {
+          priority: 150
+          direction: 'Outbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: 'VirtualNetwork'
+          sourcePortRange: '*'
+          destinationAddressPrefix: 'Sql'
+          destinationPortRanges: ['1433', '11000-11999']
+        }
+      }
+      {
         // Microsoft Graph, Defender for Storage result endpoints and the Container Apps control plane
         // are not covered by a single service tag. Egress inspection is out of scope (ADR-008).
         name: 'AllowInternetHttpsOutbound'

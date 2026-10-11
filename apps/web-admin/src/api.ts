@@ -1,5 +1,5 @@
 import { createApi, type Api } from "@pipeline/api-client";
-import type { AuthProvider } from "@pipeline/auth";
+import { runtimeEnv, type AuthProvider } from "@pipeline/auth";
 import { useAuth } from "@pipeline/auth/react";
 import { useMemo } from "react";
 
@@ -10,7 +10,8 @@ export function useApi(): Api {
   return useMemo(() => {
     let api = cache.get(provider);
     if (!api) {
-      api = createApi(provider);
+      // Same origin by default; the Container App's origin where there is no Front Door (INF-2).
+      api = createApi(provider, runtimeEnv()?.VITE_API_BASE_URL ?? "");
       cache.set(provider, api);
     }
     return api;

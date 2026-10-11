@@ -101,6 +101,7 @@ module identity 'modules/identity.bicep' = {
 module keyvault 'modules/keyvault.bicep' = {
   name: 'keyvault-${env}'
   params: {
+    workspaceId: monitoring.outputs.workspaceId
     location: location
     env: env
     tags: tags
@@ -116,6 +117,7 @@ module keyvault 'modules/keyvault.bicep' = {
 module storage 'modules/storage.bicep' = {
   name: 'storage-${env}'
   params: {
+    workspaceId: monitoring.outputs.workspaceId
     location: location
     env: env
     tags: tags
@@ -215,6 +217,9 @@ module containerapps 'modules/containerapps.bicep' = {
     authAudience: authAudience
     authAllowedAzp: authAllowedAzp
     authAdminAzp: authAdminAzp
+    corsAllowedOrigins: deployFrontDoor
+      ? ''
+      : 'https://${swa.outputs.pwaDefaultHostname},https://${swa.outputs.adminDefaultHostname}'
     stagingBlobEndpoint: storage.outputs.stagingBlobEndpoint
     documentsBlobEndpoint: storage.outputs.documentsBlobEndpoint
     teamsAppId: teamsAppId
@@ -232,6 +237,7 @@ module frontdoor 'modules/frontdoor.bicep' = {
     adminHostname: swa.outputs.adminDefaultHostname
     apiFqdn: containerapps.outputs.apiFqdn
     managedEnvironmentId: containerapps.outputs.environmentId
+    workspaceId: monitoring.outputs.workspaceId
   }
 }
 
@@ -245,6 +251,7 @@ module fabricgateway 'modules/fabricgateway.bicep' = {
 
 output apiFqdn string = containerapps.outputs.apiFqdn
 output frontDoorHostname string = frontdoor.outputs.endpointHostname
+output frontDoorAdminHostname string = frontdoor.outputs.adminEndpointHostname
 output pwaHostname string = swa.outputs.pwaDefaultHostname
 output adminHostname string = swa.outputs.adminDefaultHostname
 output acrLoginServer string = acr.outputs.loginServer

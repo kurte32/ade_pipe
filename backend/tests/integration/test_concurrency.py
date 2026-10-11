@@ -65,6 +65,48 @@ def test_concurrent_update_same_rowversion_rejects_the_loser(one_site: int) -> N
         s2.close()
 
 
+def test_http_burst_same_if_match_has_one_winner(client, coord_a_headers, two_sites):  # type: ignore[no-untyped-def]
+    """TST-4: the ORM-level test above is mirrored over HTTP: N transitions with the same
+    If-Match yield exactly one 201, the rest 412, and one history row."""
+    import threading
+
+    sid = two_sites["a"]
+    client.put(
+        f"/api/v1/sitios/{sid}/contacto",
+        json={"nombre": "Dueño", "telefono": "5512345678"},
+        headers=coord_a_headers,
+    )
+    etag = client.get(f"/api/v1/sitios/{sid}", headers=coord_a_headers).json()["etag"]
+    codes: list[int] = []
+    lock = threading.Lock()
+
+    def go() -> None:
+        r = client.post(
+            f"/api/v1/sitios/{sid}/transiciones",
+            json={"estatus_destino": "dueno_localizado"},
+            headers={**coord_a_headers, "If-Match": f'"{etag}"'},
+        )
+        with lock:
+            codes.append(r.status_code)
+
+    threads = [threading.Thread(target=go) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(codes) == [201] + [412] * 7, codes
+    with _sistema_session() as s:
+        from sqlalchemy import text
+
+        n = s.execute(
+            text(
+                "SELECT COUNT(*) FROM sitio_estatus_historial WHERE sitio_id = :id AND tipo = 'avance'"
+            ),
+            {"id": sid},
+        ).scalar()
+    assert n == 1
+
+
 def test_concurrent_same_idempotency_key_returns_stored_response(  # type: ignore[no-untyped-def]
     client, coord_a_headers, two_sites
 ) -> None:

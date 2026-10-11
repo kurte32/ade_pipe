@@ -9,7 +9,11 @@ param deployFrontDoor = false
 param deployGatewaySubnet = false
 // Fail-closed (audit D-07): the office/VPN CIDRs come from DEV_ALLOWED_INGRESS_CIDRS (comma-separated)
 // at deploy time. Without it only 127.0.0.1/32 is allowed, i.e. nothing outside can reach the API.
-param allowedIngressCidrs = split(readEnvironmentVariable('DEV_ALLOWED_INGRESS_CIDRS', '127.0.0.1/32'), ',')
+// GitHub always defines the variable (empty when unset), so the default alone never applied; an
+// empty value falls back to localhost only (fail closed, audit CI-3).
+param allowedIngressCidrs = empty(trim(readEnvironmentVariable('DEV_ALLOWED_INGRESS_CIDRS', '')))
+  ? ['127.0.0.1/32']
+  : split(readEnvironmentVariable('DEV_ALLOWED_INGRESS_CIDRS', ''), ',')
 
 param authTenantId = '00000000-0000-0000-0000-000000000000'
 param authAudience = '00000000-0000-0000-0000-000000000001'

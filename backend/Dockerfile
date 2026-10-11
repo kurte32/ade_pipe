@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.12-slim-bookworm AS base
+# Pinned by digest (audit INF-5); bump deliberately with `docker buildx imagetools inspect`.
+FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS base
 
 ARG INSTALL_DEV=false
 # An image started without ENVIRONMENT fails closed: the deployment guard applies.
@@ -17,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg2 ca-
     && apt-get update && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc \
     && apt-get purge -y gnupg2 && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.4@sha256:341e448d2ca38f11d8e2768db5464b4c95a4d87f539b8cb7511db86b02fef97e /uv /bin/uv
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./

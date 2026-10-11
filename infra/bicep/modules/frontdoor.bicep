@@ -1,5 +1,7 @@
 // Azure Front Door Premium with WAF (AZURE_DESIGN.md section 3 zone 2).
-// Routes: /api/* -> Container Apps (Private Link origin), /admin/* -> admin SWA, /* -> PWA SWA.
+// Two endpoints (audit INF-1): the PWA host serves /api/* -> Container Apps and /* -> PWA SWA; the
+// admin host serves /api/* -> Container Apps and /* -> admin SWA. Host-based routing keeps both
+// SPAs built with base '/', promotes one bundle unchanged and keeps MSAL's redirect URI = origin.
 
 param env string
 param tags object
@@ -18,6 +20,7 @@ param wafMode string = 'Prevention'
 
 var profileName = 'afd-pipeline-${env}'
 var endpointName = 'pipeline-${env}'
+var adminEndpointName = 'pipeline-${env}-admin'
 var wafName = replace('wafpipeline${env}', '-', '')
 
 resource profile 'Microsoft.Cdn/profiles@2024-02-01' = if (enabled) {
@@ -33,6 +36,14 @@ resource profile 'Microsoft.Cdn/profiles@2024-02-01' = if (enabled) {
 resource endpoint 'Microsoft.Cdn/profiles/afdEndpoints@2024-02-01' = if (enabled) {
   parent: profile
   name: endpointName
+  location: 'global'
+  tags: tags
+  properties: { enabledState: 'Enabled' }
+}
+
+resource adminEndpoint 'Microsoft.Cdn/profiles/afdEndpoints@2024-02-01' = if (enabled) {
+  parent: profile
+  name: adminEndpointName
   location: 'global'
   tags: tags
   properties: { enabledState: 'Enabled' }
@@ -88,7 +99,7 @@ resource securityPolicy 'Microsoft.Cdn/profiles/securityPolicies@2024-02-01' = i
       wafPolicy: { id: waf.id }
       associations: [
         {
-          domains: [{ id: endpoint.id }]
+          domains: [{ id: endpoint.id }, { id: adminEndpoint.id }]
           patternsToMatch: ['/*']
         }
       ]
@@ -146,8 +157,11 @@ resource origins 'Microsoft.Cdn/profiles/originGroups/origins@2024-02-01' = [
 
 var routes = [
   { name: 'api', group: 2, patterns: ['/api/*'] }
-  { name: 'admin', group: 1, patterns: ['/admin', '/admin/*'] }
   { name: 'pwa', group: 0, patterns: ['/*'] }
+]
+var adminRoutes = [
+  { name: 'api', group: 2, patterns: ['/api/*'] }
+  { name: 'admin', group: 1, patterns: ['/*'] }
 ]
 
 resource routeResources 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = [
@@ -168,5 +182,40 @@ resource routeResources 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' 
   }
 ]
 
+resource adminRouteResources 'Microsoft.Cdn/profiles/afdEndpoints/routes@2024-02-01' = [
+  for r in adminRoutes: if (enabled) {
+    parent: adminEndpoint
+    name: r.name
+    properties: {
+      originGroup: { id: groups[r.group].id }
+      supportedProtocols: ['Https']
+      patternsToMatch: r.patterns
+      forwardingProtocol: 'HttpsOnly'
+      linkToDefaultDomain: 'Enabled'
+      httpsRedirect: 'Enabled'
+      enabledState: 'Enabled'
+      cacheConfiguration: null
+    }
+    dependsOn: [origins]
+  }
+]
+
+@description('Log Analytics workspace for access, WAF and health-probe logs (audit INF-4).')
+param workspaceId string = ''
+
+resource diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (enabled && !empty(workspaceId)) {
+  name: 'frontdoor-to-log-analytics'
+  scope: profile
+  properties: {
+    workspaceId: workspaceId
+    logs: [
+      { category: 'FrontDoorAccessLog', enabled: true }
+      { category: 'FrontDoorWebApplicationFirewallLog', enabled: true }
+      { category: 'FrontDoorHealthProbeLog', enabled: true }
+    ]
+  }
+}
+
 output endpointHostname string = enabled ? endpoint!.properties.hostName : ''
+output adminEndpointHostname string = enabled ? adminEndpoint!.properties.hostName : ''
 output profileName string = enabled ? profile!.name : ''

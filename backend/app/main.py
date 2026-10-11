@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import get_settings
@@ -47,6 +48,17 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.deployed else "/api/openapi.json",
     )
     app.add_middleware(CorrelationMiddleware)
+    if settings.cors_origins:
+        # Only for environments where the SPAs are not served from the API's origin (no Front
+        # Door, audit INF-2). Explicit allowlist, bearer tokens only, no credentials.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_methods=["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
+            allow_headers=["authorization", "content-type", "if-match", "idempotency-key"],
+            expose_headers=["etag", "x-correlation-id", "content-disposition"],
+            max_age=600,
+        )
     # Added last so it runs first: oversized bodies never reach the app (audit B-05).
     app.add_middleware(BodyLimitMiddleware, limit=settings.max_request_bytes)
     register_error_handlers(app)

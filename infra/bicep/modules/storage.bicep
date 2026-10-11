@@ -18,6 +18,8 @@ param privateNetworking bool = true
 param allowTrustedAzureServices bool = true
 @description('Enable Defender for Storage on-upload malware scanning on the staging account (requires the Defender plan).')
 param enableDefenderScanning bool = true
+@description('Log Analytics workspace for blob read/write/delete logs on both accounts (audit INF-4).')
+param workspaceId string = ''
 param defenderCapGbPerMonth int = 1000
 @description('Time-based immutability period for the documents container in days. 0 disables the policy (dev).')
 param documentsImmutabilityDays int = 1826
@@ -142,6 +144,31 @@ resource documentsBlob 'Microsoft.Storage/storageAccounts/blobServices@2023-05-0
   properties: {
     deleteRetentionPolicy: { enabled: true, days: 30 }
     containerDeleteRetentionPolicy: { enabled: true, days: 30 }
+  }
+}
+
+resource documentsBlobDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!empty(workspaceId)) {
+  name: 'documents-blob-to-log-analytics'
+  scope: documentsBlob
+  properties: {
+    workspaceId: workspaceId
+    logs: [
+      { category: 'StorageRead', enabled: true }
+      { category: 'StorageWrite', enabled: true }
+      { category: 'StorageDelete', enabled: true }
+    ]
+  }
+}
+
+resource stagingBlobDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (!empty(workspaceId)) {
+  name: 'staging-blob-to-log-analytics'
+  scope: stagingBlob
+  properties: {
+    workspaceId: workspaceId
+    logs: [
+      { category: 'StorageWrite', enabled: true }
+      { category: 'StorageDelete', enabled: true }
+    ]
   }
 }
 

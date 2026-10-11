@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     auth_allowed_azp: str = ""
     # Client id of the admin SPA registration; Admin is exercised only from it when set (IDN-5).
     auth_admin_azp: str = ""
+    # SPA origins allowed by CORS. Empty behind Front Door (same origin); the SWA hosts without it.
+    cors_allowed_origins: str = ""
     auth_issuer: str
     auth_jwks_url: str
     auth_required_scope: str = "access_as_user"
@@ -95,6 +97,10 @@ class Settings(BaseSettings):
     @classmethod
     def _strip_slash(cls, v: str) -> str:
         return v.rstrip("/")
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.cors_allowed_origins.split(",") if o.strip()]
 
     @property
     def deployed(self) -> bool:

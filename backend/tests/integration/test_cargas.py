@@ -115,6 +115,14 @@ def _cleanup() -> Iterator[None]:
             )
         )
         s.execute(text("DELETE FROM carga_lote WHERE archivo_nombre LIKE 'carga-test%'"))
+        # the self-provisioned base lot of test_reload is re-created on every run (audit TST-3)
+        s.execute(
+            text(
+                "DELETE FROM carga_fila_staging WHERE lote_id IN "
+                "(SELECT id FROM carga_lote WHERE archivo_nombre LIKE 'carga-base-%')"
+            )
+        )
+        s.execute(text("DELETE FROM carga_lote WHERE archivo_nombre LIKE 'carga-base-%'"))
 
 
 def test_coordinator_cannot_use_admin_routes(client, coord_a_headers) -> None:  # type: ignore[no-untyped-def]

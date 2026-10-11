@@ -23,8 +23,9 @@ async function openSitio(page: Page, id: number) {
 
 async function pickProspectado(): Promise<number> {
   const list = await sitiosDe("ard", "sitio_prospectado", used);
-  const s = list.find((x) => !x.devuelto) ?? list[0];
-  if (!s) throw new Error("no hay sitios prospectados para ard");
+  // Never fall back to a returned site: its conflict banner changes the flow (audit TST-3).
+  const s = list.find((x) => !x.devuelto);
+  if (!s) throw new Error("no hay sitios prospectados (no devueltos) para ard");
   used.push(s.id);
   return s.id;
 }

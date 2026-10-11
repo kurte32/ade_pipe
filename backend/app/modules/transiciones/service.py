@@ -257,6 +257,14 @@ def avanzar(
 
     if destino not in ESTATUS_ORDER:
         raise unprocessable("Estatus destino no permitido para el coordinador")
+    # Hold the row for the whole check-and-write, and re-read it under the lock BEFORE the
+    # precondition: a request that waited on the lock must see the writer's new version and get
+    # 412, and a concurrent document delete cannot slip between the check and the commit
+    # (audit DAT-2, TST-4). with_for_update() renders nothing on SQL Server; the hint is the lock.
+    session.execute(
+        select(Sitio).where(Sitio.id == sitio.id).with_hint(Sitio, "WITH (UPDLOCK, ROWLOCK)")
+    ).scalar_one()
+    session.refresh(sitio)
     _require_if_match(sitio, if_match, claims)
     siguiente = rules.next_estatus(sitio.estatus)
     if siguiente is None:
@@ -266,12 +274,6 @@ def avanzar(
             "Solo se puede avanzar un estatus a la vez",
             {"estatus_actual": sitio.estatus, "estatus_siguiente": siguiente},
         )
-    # Hold the row while the requirements are evaluated so a concurrent document delete cannot
-    # slip between the check and the commit (audit DAT-2); file writes lock the same row.
-    session.execute(
-        select(Sitio).where(Sitio.id == sitio.id).with_hint(Sitio, "WITH (UPDLOCK, ROWLOCK)")
-    ).scalar_one()
-    session.refresh(sitio)
     faltantes = rules.check(destino, sitio, _required_docs(session))
     if faltantes:
         raise unprocessable(
