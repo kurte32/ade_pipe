@@ -6,7 +6,7 @@ import { useApi } from "../api";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { getDb, getMeta, type OperacionTipo } from "../db/schema";
-import { META_LAST_SYNC, ensureOwner, enqueue, syncAll, type SyncDeps, type SyncOutcome } from "./engine";
+import { META_LAST_SYNC, ensureOwner, enqueue, resetCache, syncAll, type SyncDeps, type SyncOutcome } from "./engine";
 
 export interface SyncState {
   online: boolean;
@@ -18,6 +18,8 @@ export interface SyncState {
   pendingCount: number;
   blockedCount: number;
   syncNow: () => Promise<SyncOutcome | null>;
+  /** Download every site again (keeps queued changes); the way out of a diverged cache. */
+  redownload: () => Promise<SyncOutcome | null>;
   enqueueOp: (sitioId: number, tipo: OperacionTipo, payload: unknown) => Promise<void>;
   deps: SyncDeps;
 }
@@ -113,6 +115,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     return p;
   }, [account, deps, storeReady]);
 
+  const redownload = useCallback(async (): Promise<SyncOutcome | null> => {
+    await resetCache(db);
+    queryClient.clear();
+    return syncNow();
+  }, [db, queryClient, syncNow]);
+
   const enqueueOp = useCallback(
     async (sitioId: number, tipo: OperacionTipo, payload: unknown) => {
       await enqueue(deps, sitioId, tipo, payload);
@@ -151,10 +159,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       pendingCount: pendingCount ?? 0,
       blockedCount: blockedCount ?? 0,
       syncNow,
+      redownload,
       enqueueOp,
       deps,
     }),
-    [online, syncing, needsLogin, lastSyncAt, lastOutcome, lastError, pendingCount, blockedCount, syncNow, enqueueOp, deps],
+    [online, syncing, needsLogin, lastSyncAt, lastOutcome, lastError, pendingCount, blockedCount, syncNow, redownload, enqueueOp, deps],
   );
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;
 }

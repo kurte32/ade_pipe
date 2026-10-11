@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 import { PWA_URL, signInAs } from "../helpers/auth";
@@ -18,6 +19,10 @@ test.describe("UX: layout and keyboard (coordinador)", () => {
       await page.keyboard.press("Tab");
       const outline = await page.evaluate(() => getComputedStyle(document.activeElement!).outlineStyle);
       expect(outline).not.toBe("none");
+      // Automated WCAG 2 A/AA scan (backlog UX-SR); a screen-reader walkthrough is still manual.
+      const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+      const serious = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+      expect(serious.map((v) => `${v.id} on ${path}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
     }
   });
 });

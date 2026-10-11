@@ -95,7 +95,25 @@ export function MisSitios() {
 
   return (
     <main className="narrow">
-      <PageHeader title="Mis sitios" description={sitios.length ? `${sitios.length} sitios asignados` : undefined} />
+      <PageHeader
+        title="Mis sitios"
+        description={sitios.length ? `${sitios.length} sitios asignados` : undefined}
+        actions={
+          sync.online ? (
+            <button
+              type="button"
+              className="ghost small"
+              onClick={() => void sync.redownload()}
+              disabled={sync.syncing}
+              title="Vuelve a descargar todos tus sitios del servidor. Tus capturas pendientes se conservan."
+              data-testid="redownload"
+            >
+              <Icon name="refresh" size={16} />
+              Volver a descargar
+            </button>
+          ) : null
+        }
+      />
 
       {sitios.length === 0 ? (
         <EmptyState icon="store" title="Todavía no tienes sitios asignados">

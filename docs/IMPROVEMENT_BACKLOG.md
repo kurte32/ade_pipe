@@ -53,7 +53,6 @@ depends on third parties).
 | SIM | Azure SQL failover and Graph outage simulations | Engineering | P1 | S | PRODUCTION_READINESS §8 |
 | SCANS | Dependency and image scans in CI; Defender for Cloud recommendations | Engineering | P1 | S | PRODUCTION_READINESS §8 |
 | LOG-REVIEW | Manual sample of production logs for forbidden fields | Engineering | P1 | S | PRODUCTION_READINESS §8 |
-| RUNBOOKS | Reconcile `docs/OPERATIONS.md` RB-01…RB-10 with `architecture/PRODUCTION_READINESS.md` RB-01…RB-15 (numbering differs); write the missing ones; walk them through with L2 | Architect | P1 | M | see Documentation inconsistencies below |
 | DRIFT | Nightly `drift.yml` green against test and prod | Engineering | P1 | S | AZURE_DEPLOYMENT §8 |
 | GO-LIVE | Production from the same digest and bundles, rollback rehearsal, delete locks and break-glass, go-live checklist signed, two-week pilot in one region | Engineering + Seguridad | P0 | L | PRODUCTION_READINESS_PLAN Phase 5 |
 | SUPPORT | Support model (L1 TI, L2 Subdirección de IA), on-call rota, severity model, paging tool, SLO targets | TI + Subdirección | P1 | M | PRODUCTION_READINESS §1, §7 |
@@ -68,8 +67,7 @@ depends on third parties).
 | LEDGER-DIGEST | Configure external ledger digest storage so `sp_verify_database_ledger` checks against an immutable copy | P2 | S | OPERATIONS RB-08 |
 | SHA-STREAM | Streaming SHA-256 for large PDFs on the phone (today the file is hashed in memory) | P3 | M | DELIVERY_REPORT §10 item 7 |
 | XLS-REAL | Verify `.xls` parsing with a real legacy file from the business | P2 | S | DELIVERY_REPORT §9 |
-| UX-P12 | "Volver a descargar mis sitios" action for a diverged local cache (today: sign out) | P2 | S | ux/UX_VALIDATION §4 |
-| UX-SR | Screen-reader pass (TalkBack, NVDA) and an axe scan in e2e | P1 | M | ux/UX_VALIDATION §3 |
+| UX-SR | Screen-reader pass (TalkBack, NVDA); the axe WCAG 2 A/AA scan runs in the two a11y e2e specs since 11 October | P1 | M | ux/UX_VALIDATION §3 |
 | UX-TABLES | Card layout for the admin sites table on phones | P3 | M | ux/UX_VALIDATION §4 |
 | UX-CARGAS | Tidy the "Últimas cargas" rows at 390 px | P3 | S | ux/UX_VALIDATION §4 |
 | UX-AUDIT | Glossary tooltip for audit action codes | P3 | S | ux/UX_VALIDATION §4 |
@@ -86,7 +84,7 @@ what the engineering audit of the same day left open (`docs/audit/ENGINEERING_AU
 | FE-10 | A contact or visit queued before a transition is sent unconditionally and its new ETag is recorded as "ours", so an admin change made in between is not surfaced as a 412 on the transition. Deliberate trade-off (offline devices rarely hold a fresh ETag; the backend now honours `If-Match` on captures when sent); decide whether captures should carry `etagBase` once the pilot shows how often admins change sites mid-capture | P3 | S | `apps/pwa-coordinador/src/sync/engine.ts` |
 | DAT-17 | `neutralize()` prefixes `'` to cells starting with `= + - @` at load time (into staging originals); the TDD asks for neutralisation on export, and there is no export. Harmless today; revisit when an export exists | P3 | S | `backend/app/modules/cargas/validation.py` |
 | DAT-14b | Business tables use `datetime` (3.33 ms) while ledgers use `datetime2(3)`; a `datetime2` migration is a broad ALTER and was deferred | P3 | M | migration |
-| DAT-13b | Still unaudited writes: marking a notification read and the `escaneando` transition (outbox outcomes are audited since 11 October) | P3 | S | `notificaciones/service.py`, `archivos/service.py`, `jobs/outbox.py` |
+| DAT-13b | Still unaudited write: marking a notification read (user-facing read state; outbox outcomes and the `escaneando` transition are audited since 11 October) | P3 | S | `notificaciones/service.py`, `archivos/service.py`, `jobs/outbox.py` |
 | E2E-ENTRA | No automated acceptance run against an Entra-protected environment (Playwright signs in through the dev picker only) | P1 | M | `e2e/helpers/auth.ts` |
 
 ## 4. Product ideas (not in the TDD; need a business owner before any work)

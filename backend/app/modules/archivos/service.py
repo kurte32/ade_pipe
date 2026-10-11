@@ -282,13 +282,19 @@ def _apply_scan_result(
         )
         session.commit()
         raise unprocessable("El archivo fue identificado como malicioso y se rechazó")
-    if result == "pending":
-        subida.estado = ESTADO_ESCANEANDO
-        subida.actualizado_utc = _now()
-        return "escaneando", None
     subida.estado = ESTADO_ESCANEANDO
     subida.actualizado_utc = _now()
-    log.error("scan_error", subida_id=str(subida.id))
+    if result != "pending":
+        log.error("scan_error", subida_id=str(subida.id))
+    # Waiting for the scanner is a state change worth a ledger row (audit DAT-13).
+    auditoria.record(
+        session,
+        claims,
+        "subida_escaneando",
+        "subida_sesion",
+        str(subida.id),
+        {"sitio_id": subida.sitio_id, "resultado_escaner": result},
+    )
     return "escaneando", None
 
 

@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 import { signInAdmin } from "../helpers/admin";
@@ -31,6 +32,11 @@ test.describe("UX: accessibility (admin)", () => {
       await expect(page.locator("a.skip-link")).toHaveAttribute("href", "#contenido");
       await expect(page.getByRole("navigation", { name: "Principal" }).locator('a[aria-current="page"]')).toHaveCount(1);
       await expect(page).toHaveTitle(/Pipeline de Posibles Tiendas$/);
+      // Automated WCAG 2 A/AA scan (backlog UX-SR); a screen-reader walkthrough is still manual.
+      await page.waitForLoadState("networkidle");
+      const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+      const serious = axe.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+      expect(serious.map((v) => `${v.id} on ${path}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
     }
   });
 

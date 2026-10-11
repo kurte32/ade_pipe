@@ -220,5 +220,5 @@ already advanced (those rows go to admin review).
 `carga_cancelada`, `equivalencia_actualizada`, `subida_iniciada`, `subida_cancelada`,
 `archivo_publicado`, `archivo_retirado`, `archivo_descargado`, `archivo_rechazado_malware`,
 `archivo_purgado`, `subida_expirada` (job), `purga_bloqueada` (job: a legal hold or immutability
-policy stopped a purge), `notificacion_enviada`, `notificacion_fallida` (outbox job). Every row carries the caller's `oid`, role, client IP (respecting
+policy stopped a purge), `notificacion_enviada`, `notificacion_fallida` (outbox job), `subida_escaneando` (a file is waiting for the scanner). Every row carries the caller's `oid`, role, client IP (respecting
 `TRUSTED_PROXY_HOPS`) and the correlation id of the request; job rows carry the `Sistema` role.

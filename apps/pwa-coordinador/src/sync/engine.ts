@@ -411,6 +411,18 @@ export async function forgetSitios(db: PipelineDb, ids: number[]): Promise<void>
   });
 }
 
+/**
+ * Drop the cached sites and the delta watermark so the next sync downloads everything again,
+ * keeping queued changes and photos (UX-P12: a diverged local cache had no exit but "Salir").
+ */
+export async function resetCache(db: PipelineDb): Promise<void> {
+  await db.transaction("rw", db.sitios, db.meta, async () => {
+    await db.sitios.clear();
+    await db.meta.delete(META_MAX_ROWVERSION);
+    await db.meta.delete(META_ETAG_SUCCESSORS);
+  });
+}
+
 export async function refreshSitio(deps: SyncDeps, sitioId: number): Promise<SitioDetail | null> {
   try {
     const detail = await deps.api.get<SitioDetail>(`/api/v1/sitios/${sitioId}`);

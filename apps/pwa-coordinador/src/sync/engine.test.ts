@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { PipelineDb } from "../db/schema";
 import type { SitioDetail } from "../lib/types";
-import { META_LOST_OPS, META_MAX_ROWVERSION, META_OWNER_OID, backoffMs, ensureOwner, enqueue, pullDelta, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
+import { META_LOST_OPS, META_MAX_ROWVERSION, META_OWNER_OID, backoffMs, ensureOwner, enqueue, pullDelta, resetCache, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
 
 function detail(id: number, estatus: string, etag: string, extra: Partial<SitioDetail> = {}): SitioDetail {
   return {
@@ -438,5 +438,21 @@ describe("transient failures back off and never become terminal (FE-11, FE-14)",
     const out = await syncAll(deps);
     expect(out.sent).toBe(0);
     expect(out.offline).toBe(true); // backing off, not failed
+  });
+});
+
+describe("resetCache (UX-P12)", () => {
+  it("drops cached sites and the watermark but keeps queued changes, then a sync downloads everything", async () => {
+    await enqueue(deps, 1, "contacto", { nombre: "Ana", telefono: "2281234567", correo: null, notas: null });
+    await db.meta.put({ key: META_MAX_ROWVERSION, value: "00aa" });
+    await resetCache(db);
+    expect(await db.sitios.count()).toBe(0);
+    expect(await db.operaciones.count()).toBe(1);
+    expect(await db.meta.get(META_MAX_ROWVERSION)).toBeUndefined();
+    api.deltaItems = [detail(5, "sitio_prospectado", "e5-1")];
+    await syncAll(deps);
+    const call = api.calls.find((c) => c.path.startsWith("/api/v1/sitios/delta"));
+    expect(call?.path).not.toContain("desde=");
+    expect(await db.sitios.get(5)).toBeDefined();
   });
 });
