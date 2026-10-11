@@ -81,8 +81,9 @@ repository. Read its unit tests first (`engine.test.ts`); they encode the invari
   deletes sites the coordinator can no longer see.
 - **Sync triggers:** every 30 s when online, the `online` event, every enqueue, and the sync
   chip. The service worker never syncs (it cannot obtain tokens).
-- **"Salir" clears everything local, including unsent captures.** Any UI or support flow that
-  signs the user out must check `pendingCount` first (see backlog item UX-SALIR).
+- **"Salir" clears everything local, including unsent captures.** `Shell` asks for confirmation
+  when `pendingCount + blockedCount > 0` (dialog `dialog-salir`, e2e `pwa.salir.spec.ts`); any
+  other flow that signs the user out must do the same.
 
 Uploads: PDFs use the resumable session protocol online only (`upload/resumable.ts`, session id
 and hash kept in `meta` so a cut upload resumes); photos are compressed on the phone
@@ -160,9 +161,9 @@ Spec names must match `pwa.*.spec.ts` or `admin.*.spec.ts` (Playwright projects)
 (Playwright against `make up` + `pnpm dev`), gitleaks, Bicep build/lint, actionlint. Every action
 is pinned to a commit SHA. Locally: `make lint && make test && pnpm -r test && make e2e`.
 
-Test counts on this branch: backend 58 unit + 63 integration functions, frontend 28, Playwright 17.
-Known gap: `tests/integration/test_concurrency.py` lacks the `integration` marker, so
-`make test-unit` fails without the stack (backlog TEST-MARK).
+Test counts on this branch: backend 58 unit + 63 integration functions, frontend 28, Playwright 18.
+Every file under `tests/integration/` carries `pytestmark = pytest.mark.integration`, so
+`make test-unit` runs without the stack; keep the marker when adding a file there.
 
 ## 8. Things that are easy to get wrong
 

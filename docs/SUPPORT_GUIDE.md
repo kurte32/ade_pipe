@@ -6,9 +6,11 @@ reports a problem · **Source of truth:** `docs/OPERATIONS.md` for platform runb
 behaviour; this guide starts from the user's symptom.
 
 > **Before any "sign out and back in" advice:** "Salir" in the coordinator app deletes everything
-> stored on the phone, including captures and photos not yet sent. Ask the coordinator to look at
-> the sync chip in the top bar: if it says "n por enviar" or "n requieren atención", they must
-> sync first (or resolve the blocked items). Only "Al día" is safe to sign out from.
+> stored on the phone, including captures and photos not yet sent. When something is unsent the
+> app asks first ("¿Salir sin enviar?", with "Sincronizar primero" and "Salir y borrar"); tell the
+> coordinator to choose "Sincronizar primero" and wait for the chip to read "Al día". Blocked items
+> ("n requieren atención") never sync on their own: they must be resolved from the site first.
+> Only "Al día" is safe to sign out from.
 
 ## 1. Who does what
 

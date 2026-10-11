@@ -16,6 +16,8 @@ from app.core.clock import to_utc_naive, utcnow
 from app.core.db import SYSTEM_OID, session_factory, set_session_context
 from app.models import Sitio
 
+pytestmark = pytest.mark.integration
+
 
 def _sistema_session():  # type: ignore[no-untyped-def]
     session = session_factory()()

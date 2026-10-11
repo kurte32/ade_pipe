@@ -33,6 +33,7 @@ depends on third parties).
 | Pend 4/5/8 | Business catalogs: required documents, minimum fields per status, return reasons, terminal statuses. Provisional values are seeded | Negocio | P0 | S (after decision) | TO_BE Q5 |
 | Pend 7 | Retention start event, legal hold, treatment of discarded sites | Legal | P0 | S (after decision) | TO_BE Q1 |
 | Pend 13 | Privacy notice shown before capturing owner contact data | Legal | P0 | S (after text) | PRODUCTION_READINESS §8 |
+| ADMIN-BASE | The admin web cannot work behind the current Front Door routing. `build-deploy.yml` builds it once with base `/`; Front Door forwards `/admin/*` to the admin SWA with the prefix intact, so `/admin/assets/x.js` misses `assets/x.js` and the SWA fallback serves `index.html` as the script; and MSAL redirects to the origin, which Front Door routes to the PWA. Three coupled changes (bundle base, Front Door rewrite or routing, redirect URI) across the pipeline, Bicep, SWA config and `packages/auth`, none of which can be exercised locally. Options: **(A)** two admin builds (dev `/`, test and prod `/admin/`), a Front Door rule set that strips the prefix, a redirect URI of `origin + base`; **(B)** host-based routing, `admin.<host>` to `og-admin`, base stays `/` everywhere, one bundle promotes unchanged, redirect URI unchanged (needs the prod domain, pending with TI); **(C)** Front Door in dev as well so one layout is tested early. Recommendation: B, with C once the prod domain exists | Engineering + TI | P0 | M | `.github/workflows/build-deploy.yml`, `infra/bicep/modules/frontdoor.bicep` routes, `apps/web-admin/vite.config.ts`, `packages/auth/src/msal.ts`, `AZURE_DEPLOYMENT.md` §6 and §7 |
 
 ## 2. Required before go-live (test environment exists)
 
@@ -85,13 +86,9 @@ Observed in code during the documentation pass of 11 October 2026 (read, not rep
 
 | Id | Item | Prio | Effort | Where |
 |---|---|---|---|---|
-| ADMIN-BASE | The admin SPA bundle is built once with base `/` (`VITE_BASE_PATH` is never set in `build-deploy.yml`) but Front Door routes `/admin/*` to it in test and prod; assets and `config.json` would resolve from `/`. Needs a per-environment base or a Front Door rewrite | P0 | S | `.github/workflows/build-deploy.yml` SPA build step; `infra/bicep/modules/frontdoor.bicep` admin route |
 | DEV-ENV-NAME | `params/dev.bicepparam` sets `environmentName: 'test'` for the dev environment; presumably to keep the production guard off, but undocumented | P2 | S | `infra/bicep/params/dev.bicepparam` |
-| UX-SALIR | "Salir" wipes queued captures and photos without warning; add a confirmation when `pendingCount > 0` and a "sincroniza primero" hint | P1 | S | `apps/pwa-coordinador/src/components/Shell.tsx`, `db/schema.ts` `clearLocalData` |
-| TEST-MARK | `tests/integration/test_concurrency.py` has no `integration` marker, so `make test-unit` fails without the stack | P2 | S | `backend/tests/integration/test_concurrency.py` |
 | REASIGNAR-OUTBOX | `reasignar` rewrites `coordinador_oid` on contact, visit, files and upload sessions but not `notificacion_outbox.destinatario_oid`; pending notices stay addressed to the previous coordinator | P2 | S | `backend/app/modules/transiciones/service.py` reasignar |
 | PHOTO-REPLAY | A photo retry replays `POST /subidas` through the idempotency store; the stored `partes_recibidas` can be stale, so parts may be sent again (harmless but wasteful) | P3 | S | `apps/pwa-coordinador/src/sync/engine.ts` foto path |
-| HEAD-DOWNLOAD | The download handler has a HEAD branch but the route is registered as GET only | P3 | S | `backend/app/modules/archivos/router.py` |
 | ENTREGADO | Status `entregado` is seeded as terminal but no code path assigns it; either add the admin action or drop it from the catalog once Negocio decides (pendiente Q5) | P2 | S | `backend/app/models.py`, `transiciones/service.py` |
 | E2E-ENTRA | No automated acceptance run against an Entra-protected environment (Playwright signs in through the dev picker only) | P1 | M | `e2e/helpers/auth.ts` |
 | PROMOTE-GATE | `deploy-test` and `deploy-prod` both depend only on `build`; prod is held by reviewers, not by a green test | P2 | S | `.github/workflows/build-deploy.yml` |

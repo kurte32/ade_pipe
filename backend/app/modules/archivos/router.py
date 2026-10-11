@@ -148,7 +148,7 @@ def archivo_meta(
     return service.archivo_meta(service.get_archivo(session, _uuid(archivo_id, "archivo")))
 
 
-@router.get("/archivos/{archivo_id}", response_class=StreamingResponse)
+@router.api_route("/archivos/{archivo_id}", methods=["GET", "HEAD"], response_class=StreamingResponse)
 def descargar_archivo(
     archivo_id: str,
     request: Request,
@@ -158,9 +158,6 @@ def descargar_archivo(
     ip: str | None = Depends(client_ip),
 ) -> Response:
     archivo = service.get_archivo(session, _uuid(archivo_id, "archivo"))
-    service.record_download(session, claims, archivo, ip)
-    # Audit row is committed before any byte leaves the server (RNF-07).
-    session.commit()
     size = archivo.bytes
     rng = v.parse_range(request.headers.get("Range"), size)
     headers = {
@@ -180,7 +177,11 @@ def descargar_archivo(
         headers["Content-Length"] = str(length)
         headers["Content-Range"] = f"bytes {start}-{end}/{size}"
     if request.method == "HEAD":
+        # Headers only: no bytes leave the server, so no download is recorded.
         return Response(status_code=code, headers=headers, media_type=archivo.content_type)
+    service.record_download(session, claims, archivo, ip)
+    # Audit row is committed before any byte leaves the server (RNF-07).
+    session.commit()
     path, content_type = archivo.ruta_blob, archivo.content_type
 
     def body() -> Iterator[bytes]:

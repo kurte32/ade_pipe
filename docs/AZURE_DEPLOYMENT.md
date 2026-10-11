@@ -170,7 +170,10 @@ the previous digest, never an automatic downgrade.
 ## 6. Static Web Apps
 
 Both apps are deployed as prebuilt bundles (`skip_app_build: true`). The admin app is routed at
-`/admin/*` through Front Door, so it must be built with Vite `base: "/admin/"` (frontend concern).
+`/admin/*` through Front Door in this template, which the pipeline does not yet honour: the bundle
+is built with base `/`, Front Door forwards the `/admin/` prefix to the SWA unchanged, and MSAL
+redirects to the origin. See `IMPROVEMENT_BACKLOG.md` ADMIN-BASE for the options (the
+recommendation is a separate admin hostname, which removes the prefix altogether).
 Direct SWA hostnames remain reachable; in production restrict them to Front Door with SWA
 `networking.allowedIpRanges` set to the Front Door backend ranges or use SWA private endpoints
 (Standard SKU). This restriction is not in the template yet.

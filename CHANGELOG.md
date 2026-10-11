@@ -22,6 +22,15 @@ are tagged `release-x.y.z` on `main` (the deploy workflow matches `release-*`; s
   `e2e/tools/screenshots.mjs` screenshot tool.
 - Docs: `docs/ux/` (audit, design system, validation with before/after screenshots).
 
+### Fixed
+- Coordinator PWA: "Salir" asks for confirmation when captures are queued, in flight or blocked
+  ("Sincronizar primero" / "Salir y borrar"); it still signs out directly when the phone is up to
+  date. New e2e `pwa.salir.spec.ts`.
+- API: `HEAD /archivos/{id}` is now routed (it answered 405) and returns the download headers
+  without recording a download in the audit log.
+- Backend tests: `test_concurrency.py` carries the `integration` marker, so `make test-unit` runs
+  without the stack.
+
 ## Branch `prod-readiness` · 2026-10-10 to 2026-10-11 (not merged)
 
 Phases 1 and 2 of `docs/audit/PRODUCTION_READINESS_PLAN.md`: code findings closed and the deploy

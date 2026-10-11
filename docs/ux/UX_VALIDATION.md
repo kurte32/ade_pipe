@@ -64,9 +64,11 @@ is still open. Verified results and untested areas are kept apart.
 | Playwright e2e, full suite (`make e2e`), 14 existing tests, rerun on the final commit | pass (two assertions updated on purpose: `lote-estado` now reads "Vista previa"/"Confirmada"; history shows "Devolución"/"Reasignación"; return reason shows the catalog name) |
 | New e2e `admin.a11y.spec.ts`: dialog traps focus for 8 tabs, closes with Escape, restores focus; every admin page has one `h1`, a skip link and exactly one `aria-current="page"` nav item, and a page title | pass |
 | New e2e `pwa.a11y.spec.ts` (Pixel 7 viewport): list, notifications and detail never scroll horizontally, have one `h1`, and the first tab stop shows a visible outline | pass |
+| New e2e `pwa.salir.spec.ts`: with a capture queued offline, "Salir" opens a confirmation; Cancelar keeps the session and the capture; "Sincronizar primero" closes it and the queue drains; with nothing pending "Salir" signs out directly | pass |
 | Screenshot tool `node e2e/tools/screenshots.mjs <dir> <label>`: every screen at 390 × 844 and 1366 × 900, console and page errors collected | 24 captures, no console errors |
 
-Backend tests were not touched and were not rerun: no backend file changed (`git diff --stat`).
+Backend: `tests/integration/test_archivos.py` gained a `HEAD` assertion with the route change
+below; the archivos module tests pass against the local stack.
 
 ### In Chrome (Claude in Chrome extension, real session as `ard` and `adm`)
 
@@ -128,7 +130,7 @@ Step counts for the two most frequent tasks (counted on the running app):
 |---|---|---|
 | Official vector logo | S2 | `BrandMark` is a re-creation of the roundel; Mercadotecnia must supply the official asset. |
 | Attention queues cap | S3 | Landing-page queues come from the first 200 sites; a server-side filter (`devuelto`, `en_revision_admin`) would be needed above that volume. |
-| Stale local cache (P12) | S3 | Sign-out clears local data; a "volver a descargar mis sitios" action in the sync chip menu would make recovery discoverable. |
+| Stale local cache (P12) | S3 | Sign-out clears local data (now behind a confirmation when captures are unsent); a "volver a descargar mis sitios" action in the sync chip menu would make recovery discoverable. |
 | Screen-reader pass | S2 | Not performed. |
 | Admin tables on phones | S3 | They scroll horizontally and remain readable; a card layout for the sites table on phones would be nicer but is secondary for a desktop-first admin. |
 | Audit action labels | S3 | Actions stay as codes by design; a glossary tooltip could help new admins. |

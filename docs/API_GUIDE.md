@@ -171,6 +171,7 @@ the service verifies size and SHA-256, then asks the scanner: `SCAN_MODE=none` p
 the publication. A replaced document keeps earlier versions (`version`, `vigente`).
 
 Download: `GET /archivos/{id}` (audited before streaming, `Cache-Control: private, no-store`),
+`HEAD /archivos/{id}` for the same headers without a body or an audit row,
 `GET /archivos/{id}/meta` for metadata.
 
 ## 9. Bulk load

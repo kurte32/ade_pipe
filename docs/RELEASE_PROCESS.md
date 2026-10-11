@@ -101,9 +101,11 @@ A rollback is a release: write it in `CHANGELOG.md` and open a backlog item for 
 ## 7. Known gaps in the pipeline (tracked in `docs/IMPROVEMENT_BACKLOG.md`)
 
 - ADMIN-BASE: the admin SPA is built once with base `/` (`VITE_BASE_PATH` unset in
-  `build-deploy.yml`) while Front Door routes `/admin/*` to it in test and prod. Either the admin
-  bundle needs a per-environment base, or Front Door must rewrite `/admin/*` to `/`. Decide before
-  the first test deployment.
+  `build-deploy.yml`) while Front Door routes `/admin/*` to it in test and prod. A base-path build
+  alone is not enough (Front Door forwards `/admin/assets/...` unchanged and the SWA has
+  `assets/...` at its root), and the MSAL redirect URI is the origin, not `/admin/`. The options
+  and the recommendation (host-based routing) are in `IMPROVEMENT_BACKLOG.md` §1; decide before the
+  first test deployment.
 - DEV-ENV-NAME: `params/dev.bicepparam` sets `environmentName: 'test'` for dev (so the production
   guard does not refuse Azurite-free substitutes); document the intent in the file.
 - E2E-ENTRA: no automated acceptance against an Entra-protected environment.

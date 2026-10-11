@@ -142,8 +142,23 @@ def test_resumable_three_part_pdf_roundtrip(
     again = client.post(f"/api/v1/subidas/{sid}/completar", headers=coord_a_headers)
     assert again.status_code == 200 and again.json()["id"] == meta["id"]
 
-    # Download: full, range, foreign, meta, and site detail lists it.
+    # Download: HEAD (headers only, not audited), full, range, foreign, meta, site detail.
     aid = meta["id"]
+    head = client.head(f"/api/v1/archivos/{aid}", headers=coord_a_headers)
+    assert head.status_code == 200 and head.content == b""
+    assert head.headers["content-length"] == str(len(data))
+    assert head.headers["accept-ranges"] == "bytes"
+    with system_session() as s:
+        assert (
+            s.execute(
+                select(Auditoria).where(
+                    Auditoria.entidad == "sitio_archivo",
+                    Auditoria.entidad_id == aid,
+                    Auditoria.accion == "archivo_descargado",
+                )
+            ).first()
+            is None
+        )
     full = client.get(f"/api/v1/archivos/{aid}", headers=coord_a_headers)
     assert full.status_code == 200 and full.content == data
     assert full.headers["content-type"] == "application/pdf"
