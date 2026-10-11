@@ -61,7 +61,7 @@ is still open. Verified results and untested areas are kept apart.
 |---|---|
 | `pnpm -r typecheck` and `pnpm -r lint` (all packages and apps) | clean |
 | Frontend unit tests (`pwa-coordinador` 10, `web-admin` 7, `api-client`, `auth`) | pass |
-| Playwright e2e, full suite (`make e2e`), 14 existing tests | pass (two assertions updated on purpose: `lote-estado` now reads "Vista previa"/"Confirmada"; history shows "Devolución"/"Reasignación"; return reason shows the catalog name) |
+| Playwright e2e, full suite (`make e2e`), 14 existing tests, rerun on the final commit | pass (two assertions updated on purpose: `lote-estado` now reads "Vista previa"/"Confirmada"; history shows "Devolución"/"Reasignación"; return reason shows the catalog name) |
 | New e2e `admin.a11y.spec.ts`: dialog traps focus for 8 tabs, closes with Escape, restores focus; every admin page has one `h1`, a skip link and exactly one `aria-current="page"` nav item, and a page title | pass |
 | New e2e `pwa.a11y.spec.ts` (Pixel 7 viewport): list, notifications and detail never scroll horizontally, have one `h1`, and the first tab stop shows a visible outline | pass |
 | Screenshot tool `node e2e/tools/screenshots.mjs <dir> <label>`: every screen at 390 × 844 and 1366 × 900, console and page errors collected | 24 captures, no console errors |
@@ -80,7 +80,10 @@ Exercised and observed:
   entering 8.5 × 12 saves, the success alert reads "Medidas guardadas y enviadas.", the section
   switches to the summary with the computed 102 m² and an "Editar" control; the server state was
   refreshed by the sync that followed. No console errors.
-- Admin site detail and the Reasignar dialog opened from the header actions.
+- Admin site detail opened in the browser (header actions, stage bar, translated history). The
+  Reasignar dialog was clicked but the extension's screenshot timed out before it could be
+  observed, so the dialog behaviour is counted as verified only by the automated
+  `admin.a11y.spec.ts`, not by the Chrome session.
 
 Limitations of the Chrome session, stated plainly:
 
@@ -129,4 +132,6 @@ Step counts for the two most frequent tasks (counted on the running app):
 | Screen-reader pass | S2 | Not performed. |
 | Admin tables on phones | S3 | They scroll horizontally and remain readable; a card layout for the sites table on phones would be nicer but is secondary for a desktop-first admin. |
 | Audit action labels | S3 | Actions stay as codes by design; a glossary tooltip could help new admins. |
+| App icon lettering | S3 | `icon.svg` draws the roundel letters as SVG text in Montserrat; where the font is not installed (favicon, home-screen icon) the fallback is Arial. Resolved together with the official vector logo. |
+| Admin "Últimas cargas" rows on phones | S3 | File name, state tag and chevron wrap on 390 px; readable but not tidy. |
 | Chrome extension flakiness | tooling | Documented above; Playwright remains the CI path. |

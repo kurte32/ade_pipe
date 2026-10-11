@@ -45,8 +45,8 @@ recognisably Tiendas 3B without borrowing the marketing layout. Decisions:
   forms and tables use the device's system font: it is denser, renders faster, and costs nothing
   offline. Two families with clearly distinct roles. The uppercase weight-900 headline treatment
   of the website is not used: operational screens need quiet headings.
-- **Pills only where the site uses them**: badges and the primary button keep a rounded (not fully
-  round) 8 px radius so dense rows stay aligned; the roundel and status dots are round.
+- **Pills only where the site uses them**: badges, buttons and inputs keep a rounded (not fully
+  round) 6 px radius so dense rows stay aligned; chips, the roundel and status dots are round.
 - **No decorative gradients, carousels, hero images or oversized KPI cards.** Information first.
 
 ## 3. Tokens (`packages/ui/src/base.css`)
@@ -86,8 +86,8 @@ AA for normal text. Disabled controls use 50 % opacity and are exempt (WCAG 1.4.
 | `--font-mono` | `ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, monospace` (identifiers, codes) |
 | `--text-xs` 12 px · `--text-sm` 13 px · `--text-base` 15 px · `--text-md` 16 px · `--text-lg` 18 px · `--text-xl` 22 px · `--text-2xl` 28 px | Line-height 1.5 body, 1.25 headings |
 
-Headings: `h1` 22 px (phone) / 28 px (desktop) Montserrat 700, `h2` 16 px Montserrat 700,
-section eyebrows are never uppercase. Numbers in tables use `font-variant-numeric: tabular-nums`.
+Headings: `h1` 22 px (phone) / 28 px (desktop) Montserrat 700, `h2` 16 px (phone) / 18 px
+(desktop) Montserrat 700, section eyebrows are never uppercase. Numbers in tables use `font-variant-numeric: tabular-nums`.
 
 ### Spacing, radius, elevation, layout
 
@@ -98,8 +98,9 @@ section eyebrows are never uppercase. Numbers in tables use `font-variant-numeri
   `--shadow-md` (`0 8px 24px rgba(4,33,31,.16)`); nothing else casts a shadow.
 - Containers: PWA `--container-narrow` 720 px, admin `--container` 1280 px, 16 px side gutters,
   no horizontal page scroll at 360 px.
-- Touch targets: 44 px minimum for every interactive control on the PWA, 36 px minimum in dense
-  admin tables (WCAG 2.5.8 requires 24 px).
+- Touch targets: 44 px for primary and form controls on the PWA; 36 px for secondary chips,
+  inline actions (`.small`, `.chip`, the sync chip) and dense admin tables (WCAG 2.5.8 requires
+  24 px).
 
 ### Motion
 

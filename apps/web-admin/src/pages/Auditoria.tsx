@@ -1,3 +1,4 @@
+import { useAuth } from "@pipeline/auth/react";
 import { AUDITORIA_ACCIONES, AUDITORIA_ENTIDADES, Icon, PageHeader, ProblemAlert, Spinner, formatMexicoCity, usePageTitle } from "@pipeline/ui";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -38,9 +39,12 @@ export function Auditoria() {
   const api = useApi();
   const coords = useCoordinadores();
   const equivalencias = useEquivalencias();
+  const { account } = useAuth();
   const [draft, setDraft] = useState<Filters>(EMPTY);
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [open, setOpen] = useState<Record<number, boolean>>({});
+  // "otro" reveals a free-text oid field so any account (not only coordinators) can be filtered.
+  const [userMode, setUserMode] = useState<string>("");
 
   const q = useInfiniteQuery({
     queryKey: ["auditoria", filters],
@@ -63,8 +67,16 @@ export function Auditoria() {
       >
         <label>
           Usuario
-          <select value={draft.usuario_oid} onChange={(e) => setDraft({ ...draft, usuario_oid: e.target.value })}>
+          <select
+            value={userMode}
+            onChange={(e) => {
+              const v = e.target.value;
+              setUserMode(v);
+              setDraft({ ...draft, usuario_oid: v === "otro" ? "" : v });
+            }}
+          >
             <option value="">Todos</option>
+            {account?.oid ? <option value={account.oid}>Yo · {account.name}</option> : null}
             {(equivalencias.data ?? [])
               .filter((c) => c.oid)
               .map((c) => (
@@ -72,8 +84,15 @@ export function Auditoria() {
                   {c.usuario_codigo} · {c.nombre ?? c.correo}
                 </option>
               ))}
+            <option value="otro">Otra cuenta (oid)…</option>
           </select>
         </label>
+        {userMode === "otro" ? (
+          <label>
+            oid de la cuenta
+            <input value={draft.usuario_oid} onChange={(e) => setDraft({ ...draft, usuario_oid: e.target.value })} placeholder="00000000-0000-…" className="mono" />
+          </label>
+        ) : null}
         <label>
           Acción
           <input value={draft.accion} list="aud-acciones" data-testid="aud-accion" onChange={(e) => setDraft({ ...draft, accion: e.target.value })} placeholder="Todas" />
@@ -115,6 +134,7 @@ export function Auditoria() {
               onClick={() => {
                 setDraft(EMPTY);
                 setFilters(EMPTY);
+                setUserMode("");
               }}
             >
               Limpiar
