@@ -310,6 +310,30 @@ def test_reasignar(client, admin_headers, coord_a_headers, coord_b_headers, two_
     assert r.status_code == 422
 
 
+def test_capture_with_stale_if_match_is_412(client, coord_a_headers, two_sites):  # type: ignore[no-untyped-def]
+    """DAT-9: captures stay unconditional without If-Match, but a stale one is refused."""
+    sid = two_sites["a"]
+    r = client.put(
+        f"/api/v1/sitios/{sid}/contacto",
+        json=CONTACTO,
+        headers={**coord_a_headers, "If-Match": '"0000000000000001"'},
+    )
+    assert r.status_code == 412
+    etag = _etag(client, coord_a_headers, sid)
+    r = client.put(
+        f"/api/v1/sitios/{sid}/contacto",
+        json=CONTACTO,
+        headers={**coord_a_headers, "If-Match": f'"{etag}"'},
+    )
+    assert r.status_code == 200, r.text
+    r = client.put(
+        f"/api/v1/sitios/{sid}/visita",
+        json=VISITA,
+        headers={**coord_a_headers, "If-Match": '"0000000000000001"'},
+    )
+    assert r.status_code == 412
+
+
 def test_reasignar_to_unknown_coordinator_is_422(client, admin_headers, two_sites):  # type: ignore[no-untyped-def]
     """DAT-4: an oid with no active equivalence would make the site invisible to everyone."""
     sid = two_sites["a"]

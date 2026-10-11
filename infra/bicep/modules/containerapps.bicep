@@ -46,6 +46,8 @@ param databaseName string
 param authTenantId string
 param authAudience string
 param authAllowedAzp string
+@description('Client id of the admin SPA registration: Admin is honoured only from it.')
+param authAdminAzp string
 param stagingBlobEndpoint string
 param documentsBlobEndpoint string
 param stagingContainer string = 'staging'
@@ -75,6 +77,7 @@ var commonEnv = [
   { name: 'AUTH_TENANT_ID', value: authTenantId }
   { name: 'AUTH_AUDIENCE', value: authAudience }
   { name: 'AUTH_ALLOWED_AZP', value: authAllowedAzp }
+  { name: 'AUTH_ADMIN_AZP', value: authAdminAzp }
   { name: 'AUTH_ISSUER', value: authIssuer }
   { name: 'AUTH_JWKS_URL', value: authJwksUrl }
   { name: 'STORAGE_MODE', value: 'azure' }

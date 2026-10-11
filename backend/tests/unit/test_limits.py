@@ -24,6 +24,20 @@ def test_within_limit_passes() -> None:
     assert r.status_code == 200 and r.json() == {"n": 100}
 
 
+def test_chunked_body_over_limit_is_413_problem() -> None:
+    """A streamed body with no Content-Length that overflows must still answer 413 Problem
+    Details, even when the framework's body parser swallows the overflow (audit IDN-7)."""
+
+    def chunks():  # type: ignore[no-untyped-def]
+        for _ in range(5):
+            yield b"x" * 40
+
+    r = TestClient(_app(100)).post("/echo", content=chunks())
+    assert r.status_code == 413
+    assert r.headers["content-type"] == "application/problem+json"
+    assert r.json()["type"].endswith("payload-too-large")
+
+
 def test_declared_length_over_limit_is_413() -> None:
     r = TestClient(_app(100)).post("/echo", content=b"x" * 101)
     assert r.status_code == 413

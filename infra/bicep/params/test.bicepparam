@@ -10,6 +10,7 @@ param deployGatewaySubnet = true
 param authTenantId = '00000000-0000-0000-0000-000000000000'
 param authAudience = '00000000-0000-0000-0000-000000000011'
 param authAllowedAzp = '00000000-0000-0000-0000-000000000012,00000000-0000-0000-0000-000000000013'
+param authAdminAzp = '00000000-0000-0000-0000-000000000013'
 param sqlAdminGroupObjectId = '00000000-0000-0000-0000-000000000010'
 param sqlAdminGroupName = 'PIPELINE-SQL-Admins-test'
 param fabricWorkspaceIdentityPrincipalId = ''

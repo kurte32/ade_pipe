@@ -18,9 +18,16 @@ from app.core.storage import BlobStore, get_blob_store
 SitioId = Annotated[int, Path(ge=1, le=2_147_483_647)]
 
 
-def get_session(claims: Claims = Depends(get_claims)) -> Generator[Session, None, None]:
-    """Transactional session with SESSION_CONTEXT (oid, rol) already set. Commits on success."""
-    with session_for(claims) as session:
+def get_session(
+    request: Request, claims: Claims = Depends(get_claims)
+) -> Generator[Session, None, None]:
+    """Transactional session with SESSION_CONTEXT (oid, rol) already set. Commits on success.
+
+    The role comes from the route's `require_role` when it ran first (it does: `claims` precedes
+    `session` in every router); otherwise the token's primary role, as before.
+    """
+    role = getattr(request.state, "context_role", None)
+    with session_for(claims, role=role) as session:
         yield session
 
 

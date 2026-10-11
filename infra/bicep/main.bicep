@@ -25,6 +25,8 @@ param authTenantId string
 param authAudience string
 @description('Comma-separated client ids of pipeline-pwa-coordinador and pipeline-web-admin')
 param authAllowedAzp string
+@description('Client id of the admin SPA registration (one of authAllowedAzp).')
+param authAdminAzp string
 param sqlAdminGroupObjectId string
 param sqlAdminGroupName string
 param fabricWorkspaceIdentityPrincipalId string = ''
@@ -212,6 +214,7 @@ module containerapps 'modules/containerapps.bicep' = {
     authTenantId: authTenantId
     authAudience: authAudience
     authAllowedAzp: authAllowedAzp
+    authAdminAzp: authAdminAzp
     stagingBlobEndpoint: storage.outputs.stagingBlobEndpoint
     documentsBlobEndpoint: storage.outputs.documentsBlobEndpoint
     teamsAppId: teamsAppId

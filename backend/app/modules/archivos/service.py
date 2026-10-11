@@ -300,8 +300,9 @@ def _lock_sitio(session: Session, sitio_id: int) -> Sitio | None:
     never receive the change through the delta (audit DAT-11) and a document delete can race an
     advance past a required document (DAT-2) or two uploads past each other (DAT-3).
     """
+    # with_for_update() renders nothing on SQL Server; the hint is the lock.
     sitio = session.execute(
-        select(Sitio).where(Sitio.id == sitio_id).with_for_update()
+        select(Sitio).where(Sitio.id == sitio_id).with_hint(Sitio, "WITH (UPDLOCK, ROWLOCK)")
     ).scalar_one_or_none()
     if sitio is not None:
         sitio.actualizado_utc = _now()

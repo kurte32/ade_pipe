@@ -63,7 +63,8 @@ def _claim(session: Session, now: datetime) -> list[int]:
             )
             .order_by(NotificacionOutbox.id)
             .limit(BATCH)
-            .with_for_update(skip_locked=True)
+            # with_for_update() renders nothing on SQL Server; READPAST skips rows another run holds
+            .with_hint(NotificacionOutbox, "WITH (UPDLOCK, ROWLOCK, READPAST)")
         ).scalars()
     )
     if ids:

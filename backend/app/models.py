@@ -247,7 +247,9 @@ class SubidaSesion(Base):
     sitio_id: Mapped[int] = mapped_column(Integer, ForeignKey("sitio.id"))
     coordinador_oid: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
     tipo: Mapped[str] = mapped_column(Unicode(10))
-    tipo_documento: Mapped[str | None] = mapped_column(Unicode(50))
+    tipo_documento: Mapped[str | None] = mapped_column(
+        Unicode(50), ForeignKey("catalogo_tipo_documento.id")
+    )
     nombre_original: Mapped[str] = mapped_column(Unicode(260))
     content_type: Mapped[str] = mapped_column(Unicode(100))
     bytes_total: Mapped[int] = mapped_column(BigInteger)

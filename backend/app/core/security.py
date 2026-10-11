@@ -53,7 +53,9 @@ class Claims:
 
 @lru_cache
 def _jwks_client(url: str) -> PyJWKClient:
-    return PyJWKClient(url, cache_keys=True, lifespan=3600)
+    # A short fetch timeout: the client holds a global lock while refreshing, so a slow Entra
+    # would otherwise queue every token check for the default 30 s (audit IDN-9).
+    return PyJWKClient(url, cache_keys=True, lifespan=3600, timeout=5)
 
 
 def _unauthorized(detail: str) -> AppError:
@@ -124,10 +126,38 @@ def get_claims(
     return claims
 
 
+def effective_roles(claims: Claims, settings: Settings) -> set[str]:
+    """Roles the caller may exercise from the client it signed in with.
+
+    Admin is honoured only from the admin SPA registration (and Coordinador only from the other
+    clients) when AUTH_ADMIN_AZP is configured, so Conditional Access and assignment policies
+    scoped to the admin registration cannot be side-stepped by obtaining an Admin token through
+    the coordinator app (audit IDN-5).
+    """
+    roles = set(claims.roles)
+    admin_azp = settings.auth_admin_azp
+    if admin_azp:
+        if claims.azp != admin_azp:
+            roles.discard(ROLE_ADMIN)
+        else:
+            roles.discard(ROLE_COORDINADOR)
+    return roles
+
+
 def require_role(*allowed: str):  # type: ignore[no-untyped-def]
-    def checker(claims: Claims = Depends(get_claims)) -> Claims:
-        if not set(claims.roles) & set(allowed):
+    def checker(
+        request: Request,
+        claims: Claims = Depends(get_claims),
+        settings: Settings = Depends(get_settings),
+    ) -> Claims:
+        matched = [
+            r for r in KNOWN_ROLES if r in allowed and r in effective_roles(claims, settings)
+        ]
+        if not matched:
             raise AppError(403, "forbidden", "Sin permiso", "No tienes permiso para esta acción")
+        # The role the RLS session context runs with is the one this route is for: a user holding
+        # both app roles acts as a coordinator on coordinator routes, never as Admin (audit IDN-1).
+        request.state.context_role = matched[0]
         return claims
 
     return checker

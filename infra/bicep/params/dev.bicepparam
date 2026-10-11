@@ -14,6 +14,7 @@ param allowedIngressCidrs = split(readEnvironmentVariable('DEV_ALLOWED_INGRESS_C
 param authTenantId = '00000000-0000-0000-0000-000000000000'
 param authAudience = '00000000-0000-0000-0000-000000000001'
 param authAllowedAzp = '00000000-0000-0000-0000-000000000002,00000000-0000-0000-0000-000000000003'
+param authAdminAzp = '00000000-0000-0000-0000-000000000003'
 param sqlAdminGroupObjectId = '00000000-0000-0000-0000-000000000010'
 param sqlAdminGroupName = 'PIPELINE-SQL-Admins-dev'
 

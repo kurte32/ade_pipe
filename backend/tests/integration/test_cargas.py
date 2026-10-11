@@ -282,6 +282,7 @@ def test_reload_updates_without_touching_progress(
         if not cursor:
             break
     target = ard_sites[0]
+    untouched = ard_sites[-1]
     with system_session() as s:
         s.execute(
             text("UPDATE sitio SET estatus = :e WHERE id = :id"),
@@ -321,6 +322,12 @@ def test_reload_updates_without_touching_progress(
     assert body["revision"] == 1
     assert body["actualizadas"] == 85
 
+    # DAT-10: a row identical to the previous load leaves the site's ETag alone, so queued
+    # offline transitions on it keep working after a national reload.
+    assert (
+        client.get(f"/api/v1/sitios/{untouched['id']}", headers=admin_headers).json()["etag"]
+        == untouched["etag"]
+    )
     adv_detail = client.get(f"/api/v1/sitios/{target['id']}", headers=admin_headers).json()
     assert adv_detail["estatus"] == ESTATUS_DUENO  # progress untouched
     assert adv_detail["usuario_codigo"] == "ard"  # not reassigned
@@ -395,3 +402,31 @@ def test_confirm_rejects_unknown_planned_action(  # type: ignore[no-untyped-def]
         client.post(f"/api/v1/admin/cargas/{lote_id}/cancelar", headers=admin_headers).status_code
         == 200
     )
+
+
+def test_concurrent_confirms_yield_one_success_and_409s(client, admin_headers) -> None:  # type: ignore[no-untyped-def]
+    """DAT-12: the lote is locked while confirming; losers get 409, never a 500."""
+    import threading
+
+    csv = (
+        b"#,USUARIO,REGION,SITIO,COORDENADAS,GPS,POTENCIAL,CAMPOS,FECHA\n"
+        b'990101,ard,Xalapa,Sitio concurrente A,"19.5438, -96.9102",,Alto,24/24,09/18/2026 10:00:00\n'
+        b'990102,ard,Xalapa,Sitio concurrente B,"19.6439, -96.8103",,Alto,24/24,09/18/2026 10:00:00\n'
+    )
+    r = _upload(client, admin_headers, csv, "carga-test-concurrent.csv")
+    assert r.status_code == 201, r.text
+    lote = r.json()
+    codes: list[int] = []
+    lock = threading.Lock()
+
+    def go() -> None:
+        res = client.post(f"/api/v1/admin/cargas/{lote['id']}/confirmar", headers=admin_headers)
+        with lock:
+            codes.append(res.status_code)
+
+    threads = [threading.Thread(target=go) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(codes) == [200, 409, 409], codes

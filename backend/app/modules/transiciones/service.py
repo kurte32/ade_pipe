@@ -120,12 +120,25 @@ def _estatus_nombre(session: Session, codigo: str) -> str:
 # --- captures -----------------------------------------------------------------------------
 
 
+def _optional_if_match(sitio: Sitio, if_match: str | None, claims: Claims) -> None:
+    """Captures are unconditional by default (offline devices rarely hold a fresh ETag), but a
+    client that does send If-Match gets the stale-write protection it asked for (audit DAT-9)."""
+    if if_match is not None:
+        _require_if_match(sitio, if_match, claims)
+
+
 def upsert_contacto(
-    session: Session, claims: Claims, sitio_id: int, data: ContactoIn, ip: str | None
+    session: Session,
+    claims: Claims,
+    sitio_id: int,
+    data: ContactoIn,
+    ip: str | None,
+    if_match: str | None = None,
 ) -> ContactoResponse:
     sitio = sitios.get_sitio(session, sitio_id)
     if sitio.estatus not in ESTATUS_ORDER:
         raise unprocessable("El sitio está en un estatus terminal")
+    _optional_if_match(sitio, if_match, claims)
     now = _now()
     c = sitio.contacto
     if c is None:
@@ -162,11 +175,17 @@ def upsert_contacto(
 
 
 def upsert_visita(
-    session: Session, claims: Claims, sitio_id: int, data: VisitaIn, ip: str | None
+    session: Session,
+    claims: Claims,
+    sitio_id: int,
+    data: VisitaIn,
+    ip: str | None,
+    if_match: str | None = None,
 ) -> VisitaResponse:
     sitio = sitios.get_sitio(session, sitio_id)
     if sitio.estatus not in ESTATUS_ORDER:
         raise unprocessable("El sitio está en un estatus terminal")
+    _optional_if_match(sitio, if_match, claims)
     now = _now()
     fecha = to_utc_naive(data.fecha_visita_utc) if data.fecha_visita_utc else now
     v = sitio.visita
@@ -249,7 +268,9 @@ def avanzar(
         )
     # Hold the row while the requirements are evaluated so a concurrent document delete cannot
     # slip between the check and the commit (audit DAT-2); file writes lock the same row.
-    session.execute(select(Sitio).where(Sitio.id == sitio.id).with_for_update()).scalar_one()
+    session.execute(
+        select(Sitio).where(Sitio.id == sitio.id).with_hint(Sitio, "WITH (UPDLOCK, ROWLOCK)")
+    ).scalar_one()
     session.refresh(sitio)
     faltantes = rules.check(destino, sitio, _required_docs(session))
     if faltantes:

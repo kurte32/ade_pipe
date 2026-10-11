@@ -258,18 +258,33 @@ def decide(
     return to_summary(lote)
 
 
-def _apply_update(s: Sitio, n: dict[str, Any], now: datetime) -> None:
-    s.nombre = n["nombre"]
-    s.region = n["region"]
-    s.lat = Decimal(n["lat"])
-    s.lon = Decimal(n["lon"])
-    s.gps_texto = n.get("gps_texto")
-    s.potencial = n["potencial"]
-    s.campos_capturados = int(n["campos_capturados"])
-    s.campos_total = int(n["campos_total"])
-    s.fecha_origen_utc = datetime.fromisoformat(n["fecha_origen_utc"])
-    s.fecha_origen_texto = n["fecha_origen_texto"]
-    s.actualizado_utc = now
+def _apply_update(s: Sitio, n: dict[str, Any], now: datetime) -> bool:
+    """Write only what the file actually changed.
+
+    An unconditional write bumped every site's rowversion on each national reload, which turned
+    every coordinator's queued offline transition into a 412 (audit DAT-10). Returns True when
+    something changed.
+    """
+    values: dict[str, Any] = {
+        "nombre": n["nombre"],
+        "region": n["region"],
+        "lat": Decimal(n["lat"]),
+        "lon": Decimal(n["lon"]),
+        "gps_texto": n.get("gps_texto"),
+        "potencial": n["potencial"],
+        "campos_capturados": int(n["campos_capturados"]),
+        "campos_total": int(n["campos_total"]),
+        "fecha_origen_utc": datetime.fromisoformat(n["fecha_origen_utc"]),
+        "fecha_origen_texto": n["fecha_origen_texto"],
+    }
+    changed = False
+    for attr, value in values.items():
+        if getattr(s, attr) != value:
+            setattr(s, attr, value)
+            changed = True
+    if changed:
+        s.actualizado_utc = now
+    return changed
 
 
 _ACCIONES_VALIDAS = (ACCION_INSERTAR, ACCION_ACTUALIZAR, ACCION_REVISION, None)
@@ -277,6 +292,14 @@ _ACCIONES_VALIDAS = (ACCION_INSERTAR, ACCION_ACTUALIZAR, ACCION_REVISION, None)
 
 def confirm(session: Session, claims: Claims, lote_id: uuid.UUID) -> ConfirmResult:
     lote = get_lote(session, lote_id)
+    # Serialise confirms of one lote: the loser sees the final state and gets 409, not a unique
+    # violation turned into a 500 (audit DAT-12).
+    session.execute(
+        select(CargaLote)
+        .where(CargaLote.id == lote.id)
+        .with_hint(CargaLote, "WITH (UPDLOCK, ROWLOCK)")
+        .execution_options(populate_existing=True)
+    ).scalar_one()
     if lote.estado == ESTADO_CONFIRMADO:
         raise conflict("El lote ya fue confirmado.")
     if lote.estado != ESTADO_PREVIA:

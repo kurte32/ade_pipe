@@ -70,6 +70,7 @@ def put_contacto(
     session: Session = Depends(get_session),
     key: str | None = Depends(idempotency_key),
     ip: str | None = Depends(client_ip),
+    etag: str | None = Depends(if_match),
 ) -> JSONResponse:
     return _idempotent(
         session,
@@ -77,7 +78,7 @@ def put_contacto(
         key,
         f"PUT /sitios/{sitio_id}/contacto",
         data.model_dump(mode="json"),
-        lambda: service.upsert_contacto(session, claims, sitio_id, data, ip),
+        lambda: service.upsert_contacto(session, claims, sitio_id, data, ip, etag),
     )
 
 
@@ -89,6 +90,7 @@ def put_visita(
     session: Session = Depends(get_session),
     key: str | None = Depends(idempotency_key),
     ip: str | None = Depends(client_ip),
+    etag: str | None = Depends(if_match),
 ) -> JSONResponse:
     return _idempotent(
         session,
@@ -96,7 +98,7 @@ def put_visita(
         key,
         f"PUT /sitios/{sitio_id}/visita",
         data.model_dump(mode="json"),
-        lambda: service.upsert_visita(session, claims, sitio_id, data, ip),
+        lambda: service.upsert_visita(session, claims, sitio_id, data, ip, etag),
     )
 
 

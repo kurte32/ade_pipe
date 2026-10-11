@@ -53,6 +53,8 @@ def build_engine(settings: Settings, *, admin: bool = False, database: str | Non
     engine = create_engine(
         _odbc_url(settings, admin=admin, database=database),
         pool_pre_ping=True,
+        # Bound parameters (owner names, phones) must never reach exception text and logs (IDN-3).
+        hide_parameters=True,
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
         fast_executemany=True,
@@ -108,11 +110,11 @@ def clear_session_context(session: Session) -> None:
 
 
 @contextmanager
-def session_for(claims: Claims) -> Iterator[Session]:
+def session_for(claims: Claims, *, role: str | None = None) -> Iterator[Session]:
     """Session whose connection carries the caller's oid and role for RLS."""
     session = session_factory()()
     try:
-        set_session_context(session, str(claims.oid), claims.primary_role)
+        set_session_context(session, str(claims.oid), role or claims.primary_role)
         yield session
         session.commit()
     except Exception:

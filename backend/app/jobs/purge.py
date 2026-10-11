@@ -38,6 +38,27 @@ def _purge_one(archivo_id: uuid.UUID, store: BlobStore, now: datetime) -> str:
                 reason=type(exc).__name__,
                 status=getattr(exc, "status_code", None),
             )
+            # A legal hold or immutability policy stopping the purge is itself a retention event
+            # that compliance must be able to see in the ledger (audit DAT-13).
+            session.add(
+                Auditoria(
+                    fecha_utc=now,
+                    usuario_oid=SYSTEM_OID,
+                    rol="Sistema",
+                    accion="purga_bloqueada",
+                    entidad="sitio_archivo",
+                    entidad_id=str(archivo_id),
+                    ip=None,
+                    correlation_id=None,
+                    detalle=json.dumps(
+                        {
+                            "sitio_id": archivo.sitio_id,
+                            "motivo": type(exc).__name__,
+                            "status": getattr(exc, "status_code", None),
+                        }
+                    ),
+                )
+            )
             return "blocked"
         archivo.estado = "purgado"
         archivo.purgado_utc = now

@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     auth_tenant_id: str
     auth_audience: str
     auth_allowed_azp: str = ""
+    # Client id of the admin SPA registration; Admin is exercised only from it when set (IDN-5).
+    auth_admin_azp: str = ""
     auth_issuer: str
     auth_jwks_url: str
     auth_required_scope: str = "access_as_user"
@@ -124,6 +126,8 @@ class Settings(BaseSettings):
             problems.append("STORAGE_MODE must be 'azure'")
         if not self.allowed_azp:
             problems.append("AUTH_ALLOWED_AZP must list the SPA client ids")
+        if not self.auth_admin_azp:
+            problems.append("AUTH_ADMIN_AZP must be the admin SPA client id")
         if self.notify_mode == "graph" and not self.teams_app_id:
             problems.append("TEAMS_APP_ID is required with NOTIFY_MODE='graph'")
         if self.environment == "production":

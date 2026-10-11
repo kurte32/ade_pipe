@@ -55,7 +55,8 @@ def configure_logging(level: str = "INFO") -> None:
     logging.basicConfig(
         format="%(message)s", stream=sys.stderr, level=getattr(logging, level.upper(), logging.INFO)
     )
-    for noisy in ("azure", "urllib3", "uvicorn.access"):
+    # httpx logs every request URL at INFO: Graph lookups carry emails and oids (audit IDN-4).
+    for noisy in ("azure", "urllib3", "uvicorn.access", "httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     structlog.configure(
         processors=[
