@@ -36,7 +36,9 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   asserts one connection; four Azure Monitor alert rules in Bicep; CI service images and the
   compose stack pinned to SQL Server 2022 CU27 and Azurite 3.35.0; backend coverage gate (80 %).
 - `make e2e-preview` (also in CI): the coordinator sign-in, accessibility and flow specs run
-  against the production-built PWA with its service worker, served by `vite preview`.
+  against the production-built PWA with its service worker, served by `vite preview` under the
+  Static Web App's Content-Security-Policy. It caught that hash-wasm needs `'wasm-unsafe-eval'`
+  in `script-src`, which would have broken every upload in Azure (fixed).
 - Round three: streaming SHA-256 (hash-wasm, 4 MiB slices) so a 150 MB PDF is never held in
   memory on the phone; "Volver a descargar" on Mis sitios rebuilds the cache keeping queued changes;
   axe WCAG 2 A/AA scans in both accessibility e2e specs; the `escaneando` transition is audited;

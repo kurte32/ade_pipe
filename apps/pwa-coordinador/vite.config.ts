@@ -1,7 +1,16 @@
 /// <reference types="vitest/config" />
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
+
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+
+// `vite preview` serves the built bundle under the same Content-Security-Policy the Static Web App
+// applies, so `make e2e-preview` catches what dev servers never see (hash-wasm needed
+// 'wasm-unsafe-eval'; a dev server sends no CSP and all specs passed anyway).
+const swaConfig = JSON.parse(readFileSync(new URL("./public/staticwebapp.config.json", import.meta.url), "utf8")) as {
+  globalHeaders: Record<string, string>;
+};
 
 // Same-origin in every environment: Vite proxies /api and /dev-idp locally, Front Door routes
 // /api/* in Azure. No absolute backend URLs in code.
@@ -42,6 +51,7 @@ export default defineConfig({
     },
   },
   preview: {
+    headers: swaConfig.globalHeaders,
     proxy: {
       "/api": { target: apiTarget, changeOrigin: true },
       "/dev-idp": { target: idpTarget, changeOrigin: true, rewrite: (p) => p.replace(/^\/dev-idp/, "") },

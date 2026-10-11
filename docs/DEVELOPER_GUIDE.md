@@ -183,6 +183,10 @@ Every file under `tests/integration/` carries `pytestmark = pytest.mark.integrat
   otherwise other devices never receive the change through the delta.
 - **The PWA store belongs to one account.** `ensureOwner` clears it on an account change; any new
   table in Dexie must be cleared in `clearLocalData` too.
+- **The PWA runs under the Static Web App's Content-Security-Policy, and dev servers do not.**
+  `make e2e-preview` serves the built bundle with that policy (from `public/staticwebapp.config.json`);
+  anything that needs `eval`, WebAssembly (`'wasm-unsafe-eval'`, hash-wasm) or a new origin must be
+  allowed there first, or it works everywhere except Azure.
 - **Every `api-client` request has a 30 s timeout** (`timeoutMs` to override). A timeout is a
   transient `NetworkError`; the caller's own abort is rethrown.
 
