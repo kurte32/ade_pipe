@@ -168,6 +168,11 @@ jobs:
           cat /tmp/vite.log && exit 1
       - name: Playwright suite
         run: make e2e
+      # The production-built bundle (service worker, precache, navigation fallback) was never
+      # exercised before; the coordinator specs run once more against `vite preview` of a
+      # development-mode build with the dev identity provider allowed.
+      - name: Coordinator specs against the built PWA (service worker)
+        run: make e2e-preview
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

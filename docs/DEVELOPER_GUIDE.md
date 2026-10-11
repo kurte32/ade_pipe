@@ -161,6 +161,9 @@ Spec names must match `pwa.*.spec.ts` or `admin.*.spec.ts` (Playwright projects)
 (Playwright against `make up` + `pnpm dev`), gitleaks, Bicep build/lint, actionlint. Every action
 is pinned to a commit SHA. Locally: `make lint && make test && pnpm -r test && make e2e`.
 
+`make e2e-preview` runs the coordinator specs against the built PWA served by `vite preview`
+(service worker active), which the dev-server run never exercises; CI runs it after `make e2e`.
+
 Test counts on this branch: backend 183 (111 unit, 72 integration; `pytest --collect-only -q -m integration`), frontend 40, Playwright 18. CI also runs `alembic check` after the upgrade.
 Every file under `tests/integration/` carries `pytestmark = pytest.mark.integration`, so
 `make test-unit` runs without the stack; keep the marker when adding a file there.

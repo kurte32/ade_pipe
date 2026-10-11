@@ -219,7 +219,7 @@ Note on documented counts: `docs/DEVELOPER_GUIDE.md` says "58 unit + 63 integrat
 - Logging redaction: no test uses `caplog`; redaction covers top-level keys only (`IDN-3`, `IDN-4`).
 - MSAL provider (127 lines, zero tests; e2e uses dev auth only); `createApi().request`; `context.tsx`; `resumable.ts`; `photos.ts`; `clearLocalData`; all of `packages/ui`.
 - Config guard per rule and acceptance of a valid production config (`TST-2`, `CI-4`).
-- Production-built bundles, the service worker, SWA CSP/headers: e2e runs against Vite dev servers with the service worker disabled.
+- Production-built bundles, the service worker, SWA CSP/headers: e2e runs against Vite dev servers with the service worker disabled. *(Closed on the same day: `make e2e-preview` runs the coordinator specs against the built bundle with the service worker; SWA headers still need Azure.)*
 - Rate limiting (none exists), Range `If-Range`/multi-range, admin cancel/discard edge cases.
 - The Entra `db_auth` branch of `db-init` (`cli.py:27-41`) and the migrate job as deployed.
 - Coverage percentage: `pytest-cov` is not installed in the image; no line or branch figure exists for the backend. Vitest coverage is not configured.
