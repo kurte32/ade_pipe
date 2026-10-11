@@ -1,4 +1,5 @@
 // Time to the coordinator site list on emulated mobile networks against a running PWA (RNF-08 evidence).
+/* global process, console */
 // Usage: PWA_URL=http://localhost:4173 node tools/net-timing.mjs  (from e2e/, with the stack up)
 import { chromium, devices } from "@playwright/test";
 const PWA = process.env.PWA_URL ?? "http://localhost:4173";
