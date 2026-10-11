@@ -65,7 +65,6 @@ depends on third parties).
 | B-04r | Bulk load: reject a 100k-row XLSX in under 2 s (today 4.8 s) | P2 | M | REMEDIATION_PLAN second pass |
 | D-03r | `/readyz` cannot read `alembic_version` with the app role; expose the applied revision another way (startup log or a grant on a view) | P2 | S | PRODUCTION_READINESS_PLAN progress |
 | LEDGER-DIGEST | Configure external ledger digest storage so `sp_verify_database_ledger` checks against an immutable copy | P2 | S | OPERATIONS RB-08 |
-| SHA-STREAM | Streaming SHA-256 for large PDFs on the phone (today the file is hashed in memory) | P3 | M | DELIVERY_REPORT §10 item 7 |
 | XLS-REAL | Verify `.xls` parsing with a real legacy file from the business | P2 | S | DELIVERY_REPORT §9 |
 | UX-SR | Screen-reader pass (TalkBack, NVDA); the axe WCAG 2 A/AA scan runs in the two a11y e2e specs since 11 October | P1 | M | ux/UX_VALIDATION §3 |
 | UX-TABLES | Card layout for the admin sites table on phones | P3 | M | ux/UX_VALIDATION §4 |

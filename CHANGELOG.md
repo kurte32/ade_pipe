@@ -35,7 +35,8 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   range and unknown-unit `Range` headers ignored instead of 416; the pooled-connection RLS test
   asserts one connection; four Azure Monitor alert rules in Bicep; CI service images and the
   compose stack pinned to SQL Server 2022 CU27 and Azurite 3.35.0; backend coverage gate (80 %).
-- Round three: "Volver a descargar" on Mis sitios rebuilds the cache keeping queued changes;
+- Round three: streaming SHA-256 (hash-wasm, 4 MiB slices) so a 150 MB PDF is never held in
+  memory on the phone; "Volver a descargar" on Mis sitios rebuilds the cache keeping queued changes;
   axe WCAG 2 A/AA scans in both accessibility e2e specs; the `escaneando` transition is audited;
   runbooks RB-10 to RB-15 written and RB-03/06/07 corrected to match the code and the alerts.
 - Infrastructure and pipeline (static): admin SPA on its own Front Door host; dev SPA→API via
