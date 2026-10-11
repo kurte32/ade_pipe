@@ -36,6 +36,11 @@ export function Shell({ children, onRequestLogin }: { children: ReactNode; onReq
           Sin conexión. Puedes seguir capturando; se enviará al recuperar señal.
         </div>
       ) : null}
+      {sync.online && sync.lastOutcome?.offline ? (
+        <div className="offline-banner" role="status" data-testid="retrying-banner">
+          El servidor no responde. Tus capturas están guardadas y se reintentará automáticamente.
+        </div>
+      ) : null}
       {sync.needsLogin ? (
         <div className="offline-banner" role="alert" data-testid="needs-login-banner">
           Tu sesión expiró. Tus capturas están guardadas.{" "}
@@ -53,7 +58,7 @@ export function Shell({ children, onRequestLogin }: { children: ReactNode; onReq
       <footer className="muted" style={{ padding: "8px 16px", fontSize: "0.8rem" }}>
         {sync.lastSyncAt ? `Última sincronización: ${formatMexicoCity(new Date(sync.lastSyncAt).toISOString())}` : "Sin sincronizar"}
         {sync.pendingCount ? ` · ${sync.pendingCount} pendiente(s)` : ""}
-        {sync.blockedCount ? ` · ${sync.blockedCount} bloqueada(s)` : ""} · <Link to="/">inicio</Link>
+        {sync.blockedCount ? ` · ${sync.blockedCount} requieren atención` : ""} · <Link to="/">inicio</Link>
       </footer>
     </>
   );

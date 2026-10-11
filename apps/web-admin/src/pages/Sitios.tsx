@@ -78,10 +78,9 @@ export function Sitios() {
             onChange={(e) => setDraft({ ...draft, q: e.target.value })}
           />
         </label>
-        <label style={{ minWidth: 0, flex: 0 }}>
+        <label className="check">
           <input
             type="checkbox"
-            style={{ width: "auto", minHeight: 0 }}
             checked={draft.incluirNoVigentes}
             onChange={(e) => setDraft({ ...draft, incluirNoVigentes: e.target.checked })}
           />{" "}

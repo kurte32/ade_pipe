@@ -191,6 +191,10 @@ async function uploadFoto(api: Api, op: Operacion, foto: FotoLocal): Promise<Arc
   return done.status === 200 ? (done.data as ArchivoMeta) : null;
 }
 
+function isTransient(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 429 || e.status >= 500);
+}
+
 async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promise<StepResult> {
   if (e instanceof OfflineError || e instanceof NetworkError) return { kind: "offline" };
   if (e instanceof InteractionRequired) return { kind: "login" };
@@ -212,7 +216,7 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
     // NetworkError, so treating these as terminal would wedge the whole site chain with no
     // auto-retry (audit E-1). Keep the op pending and let the next sync drain it, capping attempts
     // so a genuinely poisoned request eventually surfaces for manual resolution.
-    if (e.status === 429 || e.status >= 500) {
+    if (isTransient(e)) {
       const intentos = (op.intentos ?? 0) + 1;
       if (intentos >= MAX_TRANSIENT_RETRIES) {
         await db.operaciones.update(op.id, {
@@ -306,7 +310,8 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
         await pullDelta(deps);
         await setMeta(db, META_LAST_SYNC, deps.now?.() ?? Date.now());
       } catch (e) {
-        if (e instanceof OfflineError || e instanceof NetworkError) outcome.offline = true;
+        // A transient server error while pulling is retried like being offline (audit E-1).
+        if (e instanceof OfflineError || e instanceof NetworkError || isTransient(e)) outcome.offline = true;
         else if (e instanceof InteractionRequired || (e instanceof ApiError && e.status === 401)) {
           outcome.needsLogin = true;
         } else throw e;

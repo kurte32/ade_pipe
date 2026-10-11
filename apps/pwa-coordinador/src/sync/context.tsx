@@ -38,11 +38,16 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const rerun = useRef(false);
 
   const pendingCount = useLiveQuery(
-    () => db.operaciones.where("estado").anyOf(["pendiente", "enviando", "error"]).count(),
+    () => db.operaciones.where("estado").anyOf(["pendiente", "enviando"]).count(),
     [db],
     0,
   );
-  const blockedCount = useLiveQuery(() => db.operaciones.where("estado").equals("bloqueada").count(), [db], 0);
+  // Ops that need the coordinator: conflicts (bloqueada) and ops that exhausted their retries (error).
+  const blockedCount = useLiveQuery(
+    () => db.operaciones.where("estado").anyOf(["bloqueada", "error"]).count(),
+    [db],
+    0,
+  );
 
   useEffect(() => {
     getMeta<number>(db, META_LAST_SYNC).then((v) => setLastSyncAt(v ?? null));

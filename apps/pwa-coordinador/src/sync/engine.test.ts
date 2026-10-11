@@ -163,6 +163,18 @@ describe("sync engine", () => {
     expect(await db.operaciones.count()).toBe(0);
   });
 
+  it("treats a 5xx while pulling the delta as transient, not as a sync error (E-1)", async () => {
+    const original = api.request.bind(api);
+    api.request = async <T,>(method: string, path: string, opts?: RequestOptions) => {
+      if (path.startsWith("/api/v1/sitios/delta")) {
+        throw new ApiError(502, { type: "x/bad-gateway", title: "x", status: 502, detail: "" }, "502");
+      }
+      return original<T>(method, path, opts);
+    };
+    const out = await syncAll(deps);
+    expect(out.offline).toBe(true);
+  });
+
   it("sends an Idempotency-Key and reuses it after a network retry", async () => {
     await enqueue(deps, 1, "contacto", { nombre: "Ana", telefono: "2281234567", correo: null, notas: null });
     api.networkDown = true;

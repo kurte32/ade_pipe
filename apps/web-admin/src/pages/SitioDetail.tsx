@@ -64,7 +64,18 @@ export function SitioDetailPage() {
       {flash ? <div className="success" role="status">{flash}</div> : null}
 
       <div className="actions">
-        <button type="button" disabled={terminal || estatusAnteriores(s.estatus).length === 0} onClick={() => setDialog("devolver")}>
+        <button
+          type="button"
+          disabled={terminal || estatusAnteriores(s.estatus).length === 0}
+          title={
+            terminal
+              ? "El sitio está en un estatus terminal."
+              : estatusAnteriores(s.estatus).length === 0
+                ? "El sitio está en el primer estatus; no hay un estatus anterior al cual devolverlo."
+                : undefined
+          }
+          onClick={() => setDialog("devolver")}
+        >
           Devolver
         </button>
         <button type="button" className="danger" disabled={terminal} onClick={() => setDialog("descartar")}>
