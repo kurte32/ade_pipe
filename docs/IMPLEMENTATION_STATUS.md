@@ -5,7 +5,9 @@
 > `.env.example`; E-1 offline sync wedges on transient 5xx), and a broken deploy path. B-01, D-01,
 > E-1 and several Medium/Low findings are now **fixed and verified in the same session** (see
 > `docs/audit/REMEDIATION_PLAN.md`). The system is still **not production-ready**: parts of the
-> deploy path are only statically corrected and nothing has been exercised in Azure. Several rows
+> deploy path are only statically corrected and nothing has been exercised in Azure.
+> **Update 2026-10-11:** all remaining code and pipeline findings are fixed (branch `prod-readiness`);
+> see `docs/audit/PRODUCTION_READINESS_PLAN.md` for phase status. Still not production-ready. Several rows
 > below remain qualified by findings in `docs/audit/`; read that set alongside this table.
 
 Updated: 2026-10-10 (final for this build). Verification vocabulary used below: `implemented and locally verified` (automated test executed against the local stack), `statically validated` (lint, build or template validation only), `validated in a test Azure environment` (none in this build), `deployed and verified in Azure` (none in this build), `not verified`. Original statuses: `not started` · `in progress` · `implemented` · `tested locally` (automated test executed and passing) · `statically validated` (lint/build only, no runtime) · `unverified` (needs Azure or a device) · `blocked` (external dependency).

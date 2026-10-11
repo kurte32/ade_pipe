@@ -85,3 +85,8 @@ for go-live.
 **Remediation status (2026-10-10):** B-01, D-01, E-1, A1, A2, B-03 fixed and verified locally;
 D-02, D-05, D-08 fixed and statically validated; D-10, D-11, B-07 doc corrections applied. D-03, D-04,
 D-06, D-07 and the B-/A-/C- items listed above remain open. Detail in `docs/audit/REMEDIATION_PLAN.md`.
+
+**Update (2026-10-11):** all remaining audit code and pipeline findings fixed on branch
+`prod-readiness` (code verified locally, pipeline statically validated), plus new findings A7, D-13,
+D-14. Open risk now sits in Azure-only validation and the pending business decisions; see
+`docs/audit/PRODUCTION_READINESS_PLAN.md`.

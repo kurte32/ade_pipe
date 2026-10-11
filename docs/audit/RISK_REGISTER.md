@@ -48,3 +48,10 @@ architecture. Urgency: **P0** = before any production claim · **P1** = before a
 tests, clean-state verification). **Fixed statically only (no Azure):** D-02, D-05, D-08.
 **Fixed (docs):** D-10, D-11, B-07. **Still open:** D-03, D-04, D-06, D-07, B-02, B-04, B-05, B-06,
 A5/D-12, C4, C5, C7, C8, C9, and the E-/Info UX items. See `REMEDIATION_PLAN.md` for the full table.
+
+## Remediation status (2026-10-11)
+
+All code and pipeline findings are now fixed: locally verified for code, statically validated for
+infrastructure and workflows. New findings A7, D-13 and D-14 were found and fixed. The remaining risk
+is concentrated in what has never run: the deploy pipeline and every Azure-only control. Those are
+tracked as Phases 3–5 of `PRODUCTION_READINESS_PLAN.md`.

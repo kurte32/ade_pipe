@@ -66,6 +66,11 @@ What is solid, and independently verified:
 
 ## Production-readiness verdict
 
+> **Update 2026-10-11:** every remaining code and pipeline finding is fixed, including D-03, D-04
+> and D-06 below, plus three new findings (A7, D-13, D-14). The verdict is unchanged because the
+> second reason, no validation in Azure, still holds. Progress is tracked in
+> `PRODUCTION_READINESS_PLAN.md`.
+
 **Not production-ready.** The Critical finding (B-01) and both High findings (D-01, E-1) are now fixed
 and verified locally, so the original gating item is cleared. The verdict stands for two independent
 reasons. First, nothing has been validated in Azure — Entra sign-in, Graph, Teams, Defender,

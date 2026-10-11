@@ -133,3 +133,27 @@ fixed and verified locally. The verdict remains **not production-ready** because
 still only statically corrected (D-02/D-05/D-08 fixed on inspection; D-03/D-04/D-06 still open) and
 nothing has been exercised in a real Azure environment. The system is a credible candidate for a
 staged rollout once the remaining deploy-path items are done and validated in a test subscription.
+
+## Second pass (2026-10-11, branch `prod-readiness`)
+
+| Finding | Fix | Verification |
+|---|---|---|
+| B-02 | Idempotency key claimed before the write; concurrent replays get the stored response | 6 concurrent same-key PUTs → all 200, one body; stable over 10 runs |
+| B-05 | 12 MiB global body limit (ASGI); part route rejects by Content-Length, then streams with a counter | Live: oversized bodies rejected with 0 bytes uploaded (was 12,582,912) |
+| B-04 | Parser stops at max_rows + 1 for XLSX/CSV/XLS; parse in threadpool | 100k-row XLSX: 4.8 s, 11 MB (was 43.8 s, 73 MB); target 2 s not met |
+| B-06 | Per-upload transactions; deterministic archivo id; lost-commit rerun completes | Real DefenderScanner on Azurite tags: isolation, malicious, pending, rerun |
+| B-08 | Explicit planned-action check | Corrupted row → 422, lot unchanged |
+| A5 / D-12 | Server-side correlation id; XFF only for TRUSTED_PROXY_HOPS; uvicorn --no-proxy-headers | Live: forged headers not stored |
+| A4 / A6 | Loopback-only compose ports; no exception names from /readyz | Stack recreated and healthy |
+| A7 (new) | Graph path segment encoded; stricter email pattern | Unit tests |
+| C4 / C5 | Self-provisioned test_reload; pytest-randomly | Alone, reversed, three seeds |
+| C7 | Per-run e2e pool; cleanup in Playwright setup/teardown | Two runs, database unchanged |
+| C8 / C9 | Graph adapter tests (incl. no contact data in Teams payload); outbox stores no raw error text | promote 0→95 %, scan 61→89 % |
+| E-2…E-4 | Retrying banner, needs-attention counts, Devolver tooltip, filter layout | Chrome |
+| D-03 | 0% revision, migrate, health, shift, automatic rollback | Static only |
+| D-04 / D-13 (new) | Digest import; environment-neutral SPA with runtime config.json | Production build checked in Chrome; import static only |
+| D-06 | CI as a required job of build-deploy; e2e and actionlint jobs in CI | actionlint |
+| D-07 | Fail-closed dev CIDR; policy check in validate.sh | Policy fails on regression |
+| D-09 / D-14 (new) | All actions SHA-pinned; Bicep pinned with checksum; trivy tag fixed | actionlint |
+
+Still open: everything that needs Azure or people (PRODUCTION_READINESS_PLAN Phases 0, 3–5).
