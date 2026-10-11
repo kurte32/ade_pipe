@@ -239,6 +239,17 @@ C = test quality, D = infra/CI-CD/docs, E = browser UX/offline reliability.
 - `aquasecurity/trivy-action@0.28.0` does not exist (tags are `v`-prefixed), so the build job would
   have failed before scanning. Pinned to `v0.36.0` by SHA.
 
+### R24 False 412 when advancing while the previous save is in flight (High) — fixed
+- Found by the first CI e2e run. Tapping "Avanzar" before the contact PUT returned queued the
+  transition with the pre-contact ETag; sent in the next sync pass, it got a spurious 412 and the
+  coordinator saw a conflict nobody caused. The engine now follows the chain of this device's own
+  successful writes when resolving an op's base ETag; other actors' changes still produce 412.
+  Reproduced deterministically in vitest and in Playwright (delayed PUT), both fixed.
+
+### CI setup defects on first GitHub run — fixed
+- pnpm 12 ignored the build-script approval in package.json; the runner's existing Microsoft keyring
+  broke the ODBC step; shellcheck flagged unused loop variables. All fixed; CI green.
+
 ## Corrections to the original findings
 - **B-08:** the "`prev is None` → 500" part does not reproduce; rows without an existing site already
   take the insert path. Only the `assert` was a defect (fixed).
