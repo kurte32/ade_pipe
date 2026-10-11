@@ -315,3 +315,37 @@ def test_cancel_and_list(client, admin_headers) -> None:  # type: ignore[no-unty
     assert (
         client.get(f"/api/v1/admin/cargas/{uuid.uuid4()}", headers=admin_headers).status_code == 404
     )
+
+
+def test_confirm_rejects_unknown_planned_action(  # type: ignore[no-untyped-def]
+    client, admin_headers, seeded_equivalencias
+) -> None:
+    """A corrupted planned action fails the confirm cleanly, applying nothing (audit B-08)."""
+    wb = load_workbook(SAMPLE)
+    ws = wb.worksheets[0]
+    ws.delete_rows(5, ws.max_row)  # header + three data rows
+    for r in ws.iter_rows(min_row=2):
+        r[0].value = int(r[0].value) + 970_000
+    buf = io.BytesIO()
+    wb.save(buf)
+    r = _upload(client, admin_headers, buf.getvalue(), "carga-b08.xlsx")
+    assert r.status_code == 201, r.text
+    lote_id = r.json()["id"]
+    _approve_all(client, admin_headers, lote_id)
+    with system_session() as s:
+        s.execute(
+            text(
+                "UPDATE carga_fila_staging SET accion_prevista = 'bogus' "
+                "WHERE lote_id = :l AND num_fila = (SELECT MIN(num_fila) FROM carga_fila_staging "
+                "WHERE lote_id = :l AND resultado <> 'error')"
+            ),
+            {"l": lote_id},
+        )
+    resp = client.post(f"/api/v1/admin/cargas/{lote_id}/confirmar", headers=admin_headers)
+    assert resp.status_code == 422, resp.text
+    lote = client.get(f"/api/v1/admin/cargas/{lote_id}", headers=admin_headers).json()
+    assert lote["lote"]["estado"] == "vista_previa"  # nothing was applied
+    assert (
+        client.post(f"/api/v1/admin/cargas/{lote_id}/cancelar", headers=admin_headers).status_code
+        == 200
+    )
