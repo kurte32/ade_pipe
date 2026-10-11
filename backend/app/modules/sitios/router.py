@@ -20,11 +20,24 @@ def list_sitios(
     q: str | None = Query(default=None, max_length=100),
     region: str | None = None,
     incluir_no_vigentes: bool = False,
+    en_revision_admin: bool | None = Query(
+        default=None, description="solo sitios que esperan una decisión del administrador"
+    ),
+    devuelto: bool | None = Query(default=None, description="solo sitios devueltos"),
     claims: Claims = Depends(_any_role),
     session: Session = Depends(get_session),
 ) -> SitioPage:
     return service.list_sitios(
-        session, claims, cursor, limit, estatus, q, region, incluir_no_vigentes
+        session,
+        claims,
+        cursor,
+        limit,
+        estatus,
+        q,
+        region,
+        incluir_no_vigentes,
+        en_revision_admin=en_revision_admin,
+        devuelto=devuelto,
     )
 
 

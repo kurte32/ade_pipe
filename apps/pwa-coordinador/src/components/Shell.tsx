@@ -3,7 +3,10 @@ import { Alert, AppBar, Icon, Modal, formatMexicoCity } from "@pipeline/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
-import { clearLocalData, getDb } from "../db/schema";
+import { useLiveQuery } from "dexie-react-hooks";
+
+import { clearLocalData, getDb, setMeta } from "../db/schema";
+import { META_LOST_OPS } from "../sync/engine";
 import { useNotificaciones } from "../lib/notificaciones";
 import { useSync } from "../sync/context";
 
@@ -48,6 +51,7 @@ export function Shell({ children, onRequestLogin }: { children: ReactNode; onReq
   const unread = avisos.data?.items.filter((n) => !n.leida).length ?? 0;
 
   const [confirmSalir, setConfirmSalir] = useState(false);
+  const lostOps = useLiveQuery(async () => ((await getDb().meta.get(META_LOST_OPS))?.value as number | undefined) ?? 0, [], 0);
   // Everything not yet accepted by the server is lost on sign-out: queued, in flight, blocked.
   const sinEnviar = sync.pendingCount + sync.blockedCount;
 
@@ -105,6 +109,13 @@ export function Shell({ children, onRequestLogin }: { children: ReactNode; onReq
           </>
         }
       />
+      {lostOps ? (
+        <Alert tone="warning" banner icon="alert-circle" testId="lost-ops-banner" onClose={() => void setMeta(getDb(), META_LOST_OPS, 0)}>
+          {lostOps === 1
+            ? "1 cambio pendiente se descartó porque el sitio ya no está asignado a ti."
+            : `${lostOps} cambios pendientes se descartaron porque sus sitios ya no están asignados a ti.`}
+        </Alert>
+      ) : null}
       {!sync.online ? (
         <Alert tone="warning" banner icon="wifi-off" testId="offline-banner">
           Sin señal. Puedes seguir capturando; todo se guarda en el teléfono y se enviará al recuperar señal.

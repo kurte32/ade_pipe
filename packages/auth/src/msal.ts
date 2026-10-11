@@ -7,6 +7,8 @@
  */
 
 import {
+  AuthError,
+  BrowserAuthError,
   BrowserCacheLocation,
   InteractionRequiredAuthError,
   PublicClientApplication,
@@ -61,7 +63,14 @@ export class MsalAuthProvider implements AuthProvider {
     this.busy = true;
     try {
       const result: AuthenticationResult | null = await this.pca.handleRedirectPromise();
-      const account = result?.account ?? this.pca.getAllAccounts()[0] ?? null;
+      // Prefer the account this device last used over an arbitrary cached one (audit FE-12).
+      const accounts = this.pca.getAllAccounts();
+      const remembered = this.account();
+      const account =
+        result?.account ??
+        accounts.find((a) => remembered && toAccount(a).oid === remembered.oid) ??
+        accounts[0] ??
+        null;
       if (account) {
         this.pca.setActiveAccount(account);
         try {
@@ -106,6 +115,15 @@ export class MsalAuthProvider implements AuthProvider {
         this.interaction = true;
         throw new InteractionRequired();
       }
+      // Any other MSAL failure is either "no route to Entra" (offline, retried later) or a
+      // reason to sign in again; neither is a reason to mark a queued change as failed (FE-6).
+      if (e instanceof BrowserAuthError && /network|no_network|timeout/i.test(e.errorCode)) {
+        throw new OfflineError();
+      }
+      if (e instanceof AuthError) {
+        this.interaction = true;
+        throw new InteractionRequired();
+      }
       throw e;
     }
   }
@@ -113,7 +131,12 @@ export class MsalAuthProvider implements AuthProvider {
   async login(): Promise<void> {
     if (this.busy) return; // never start a redirect while one is in progress (guide B7)
     this.busy = true;
-    await this.pca.loginRedirect({ scopes: this.scopes });
+    try {
+      await this.pca.loginRedirect({ scopes: this.scopes });
+    } catch (e) {
+      this.busy = false; // a failed redirect must not make the sign-in button inert (FE-12)
+      throw e;
+    }
   }
 
   async logout(): Promise<void> {

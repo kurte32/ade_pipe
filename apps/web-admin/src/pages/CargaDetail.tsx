@@ -24,7 +24,22 @@ export function CargaDetail() {
 
   const detail = useQuery({
     queryKey: ["carga", id, resultado],
-    queryFn: () => api.get<LoteDetail>(`/api/v1/admin/cargas/${id}?limit=500${resultado ? `&resultado=${resultado}` : ""}`),
+    // Every page, not the first 500 rows: a warning past the first page was undecidable and
+    // "Confirmar" was enabled only to fail with 422 (audit FE-8). Loads are capped at 5000 rows.
+    queryFn: async () => {
+      const items: LoteDetail["filas"]["items"] = [];
+      let cursor: string | null = null;
+      let lote: LoteDetail["lote"] | null = null;
+      do {
+        const page: LoteDetail = await api.get<LoteDetail>(
+          `/api/v1/admin/cargas/${id}?limit=500${resultado ? `&resultado=${resultado}` : ""}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+        );
+        lote = page.lote;
+        items.push(...page.filas.items);
+        cursor = page.filas.next_cursor ?? null;
+      } while (cursor);
+      return { lote: lote!, filas: { items, next_cursor: null } } as LoteDetail;
+    },
     enabled: !!id,
   });
   usePageTitle(detail.data ? `Carga ${detail.data.lote.archivo_nombre}` : "Carga");

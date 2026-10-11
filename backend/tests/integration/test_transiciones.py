@@ -310,6 +310,33 @@ def test_reasignar(client, admin_headers, coord_a_headers, coord_b_headers, two_
     assert r.status_code == 422
 
 
+def test_list_queue_filters(client, admin_headers, coord_a_headers, two_sites):  # type: ignore[no-untyped-def]
+    """FE-9: the admin queues are server-side filters, not a slice of the first page."""
+    sid = two_sites["a"]
+    etag = _etag(client, coord_a_headers, sid)
+    r = client.post(
+        f"/api/v1/sitios/{sid}/transiciones",
+        json={"estatus_destino": "descartado", "comentario": "ya no sirve"},
+        headers={**coord_a_headers, "If-Match": f'"{etag}"'},
+    )
+    assert r.status_code == 201
+    ids = [
+        s["id"]
+        for s in client.get(
+            "/api/v1/sitios?en_revision_admin=true&limit=200", headers=admin_headers
+        ).json()["items"]
+    ]
+    assert sid in ids
+    assert two_sites["b"] not in ids
+    ids = [
+        s["id"]
+        for s in client.get("/api/v1/sitios?devuelto=true&limit=200", headers=admin_headers).json()[
+            "items"
+        ]
+    ]
+    assert sid not in ids
+
+
 def test_capture_with_stale_if_match_is_412(client, coord_a_headers, two_sites):  # type: ignore[no-untyped-def]
     """DAT-9: captures stay unconditional without If-Match, but a stale one is refused."""
     sid = two_sites["a"]

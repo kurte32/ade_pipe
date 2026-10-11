@@ -117,11 +117,20 @@ def list_sitios(
     q: str | None,
     region: str | None,
     incluir_no_vigentes: bool,
+    *,
+    en_revision_admin: bool | None = None,
+    devuelto: bool | None = None,
 ) -> SitioPage:
     lim = min(limit or DEFAULT_LIMIT, MAX_LIMIT)
     stmt = select(Sitio)
     if not incluir_no_vigentes:
         stmt = stmt.where(Sitio.vigente == true())
+    # Server-side queues: the admin landing page used to filter the first 200 sites by id and
+    # silently miss the newest ones, which are exactly the ones a load sends to review (FE-9).
+    if en_revision_admin is not None:
+        stmt = stmt.where(Sitio.en_revision_admin == en_revision_admin)
+    if devuelto is not None:
+        stmt = stmt.where(Sitio.devuelto == devuelto)
     if estatus:
         stmt = stmt.where(Sitio.estatus == estatus)
     if region:

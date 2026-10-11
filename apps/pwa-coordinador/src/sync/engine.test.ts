@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { PipelineDb } from "../db/schema";
 import type { SitioDetail } from "../lib/types";
-import { META_LOST_OPS, META_MAX_ROWVERSION, META_OWNER_OID, ensureOwner, enqueue, pullDelta, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
+import { META_LOST_OPS, META_MAX_ROWVERSION, META_OWNER_OID, backoffMs, ensureOwner, enqueue, pullDelta, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
 
 function detail(id: number, estatus: string, etag: string, extra: Partial<SitioDetail> = {}): SitioDetail {
   return {
@@ -398,5 +398,45 @@ describe("photo upload replay (FE-4)", () => {
     expect(keys.length).toBe(2);
     expect(keys[1]).not.toBe(first);
     expect(await db.operaciones.count()).toBe(0);
+  });
+});
+
+describe("transient failures back off and never become terminal (FE-11, FE-14)", () => {
+  it("backoff is immediate once, then doubles from 30 s and caps at 30 min", () => {
+    expect(backoffMs(1)).toBe(0);
+    expect(backoffMs(2)).toBe(30_000);
+    expect(backoffMs(3)).toBe(60_000);
+    expect(backoffMs(20)).toBe(30 * 60_000);
+  });
+
+  it("a 409 (idempotency key still in flight) is retried, not blocked", async () => {
+    await enqueue(deps, 1, "transicion", { estatus_destino: "dueno_localizado", comentario: null });
+    api.failTransitionOnce = {
+      sitioId: 1,
+      error: new ApiError(409, { type: "x/conflict", title: "en curso", status: 409, detail: "sigue en curso" }, "409"),
+    };
+    let out = await syncAll(deps);
+    expect(out.blocked).toBe(0);
+    const op = (await db.operaciones.toArray())[0];
+    expect(op?.estado).toBe("pendiente");
+    out = await syncAll(deps);
+    expect(out.sent).toBe(1);
+  });
+
+  it("after repeated 5xx the op stays pendiente with a future nextAttemptAt and the chain waits", async () => {
+    await enqueue(deps, 1, "transicion", { estatus_destino: "dueno_localizado", comentario: null });
+    const err = () => new ApiError(503, { type: "x/unavailable", title: "x", status: 503, detail: "" }, "503");
+    for (let i = 0; i < 6; i++) {
+      api.failTransitionOnce = { sitioId: 1, error: err() };
+      await db.operaciones.toCollection().modify({ nextAttemptAt: 0 });
+      await syncAll(deps);
+    }
+    const op = (await db.operaciones.toArray())[0];
+    expect(op?.estado).toBe("pendiente");
+    expect(op?.intentos).toBe(6);
+    expect(op?.nextAttemptAt).toBeGreaterThan(Date.now());
+    const out = await syncAll(deps);
+    expect(out.sent).toBe(0);
+    expect(out.offline).toBe(true); // backing off, not failed
   });
 });

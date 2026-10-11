@@ -1,3 +1,4 @@
+import { ApiError } from "@pipeline/api-client";
 import { Icon } from "@pipeline/ui";
 import { useEffect, useState } from "react";
 
@@ -22,7 +23,7 @@ function LocalThumb({ blob, alt }: { blob: Blob; alt: string }) {
 function RemoteThumb({ archivoId, alt }: { archivoId: string; alt: string }) {
   const api = useApi();
   const [url, setUrl] = useState<string>("");
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<false | "offline" | "gone">(false);
   useEffect(() => {
     let objectUrl = "";
     let cancelled = false;
@@ -34,12 +35,13 @@ function RemoteThumb({ archivoId, alt }: { archivoId: string; alt: string }) {
         objectUrl = URL.createObjectURL(b);
         setUrl(objectUrl);
       })
-      .catch(() => setFailed(true));
+      .catch((e: unknown) => setFailed(e instanceof ApiError && (e.status === 404 || e.status === 410) ? "gone" : "offline"));
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [api, archivoId]);
+  if (failed === "gone") return <span className="muted small">(ya no disponible)</span>;
   if (failed) return <span className="muted small">(sin conexión)</span>;
   return url ? <img src={url} alt={alt} className="thumb" data-testid={`foto-${archivoId}`} /> : <span className="muted">…</span>;
 }

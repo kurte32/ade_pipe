@@ -7,7 +7,7 @@
  * - 412 / 422 / 404 / 409 block that operation and stop that site's chain; the server's current
  *   state (412 `current`) is stored for the conflict panel.
  * - Network failures and transient server errors (429, 5xx, timeouts) keep operations `pendiente`
- *   and auto-retry on the next sync, capped at MAX_TRANSIENT_RETRIES before surfacing as `error`.
+ *   and auto-retry on the next sync with exponential backoff (never a terminal state).
  *   401 or InteractionRequired flags "needs login".
  * - Runs in the foreground only (the service worker cannot obtain tokens).
  */
@@ -30,7 +30,6 @@ import type {
 } from "../lib/types";
 
 /** How many times a transient (429/5xx/timeout) failure is auto-retried before it surfaces (E-1). */
-export const MAX_TRANSIENT_RETRIES = 5;
 
 export const META_MAX_ROWVERSION = "sitios.maxRowversion";
 export const META_LAST_SYNC = "sync.lastAt";
@@ -250,7 +249,16 @@ async function uploadFoto(
 }
 
 function isTransient(e: unknown): boolean {
-  return e instanceof ApiError && (e.status === 429 || e.status >= 500);
+  if (!(e instanceof ApiError)) return false;
+  // 409 on a coordinator write means "the same Idempotency-Key is still being processed" (two
+  // tabs, or a retry racing its own first attempt): wait and retry, do not block (audit FE-11).
+  return e.status === 429 || e.status >= 500 || e.status === 409;
+}
+
+/** Backoff after `intentos` transient failures: immediate once, then 30 s doubling, capped (FE-14). */
+export function backoffMs(intentos: number): number {
+  if (intentos <= 1) return 0;
+  return Math.min(30_000 * 2 ** (intentos - 2), 30 * 60_000);
 }
 
 async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promise<StepResult> {
@@ -258,7 +266,7 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
   if (e instanceof InteractionRequired) return { kind: "login" };
   if (e instanceof ApiError) {
     if (e.status === 401) return { kind: "login" };
-    if ([412, 422, 404, 409, 428, 410].includes(e.status)) {
+    if ([412, 422, 404, 428, 410].includes(e.status)) {
       const current = (e.current as SitioDetail | undefined) ?? null;
       const faltantes = (e.problem?.["faltantes"] as string[] | undefined) ?? undefined;
       const siguiente = e.problem?.["estatus_siguiente"] as string | undefined;
@@ -276,15 +284,13 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
     // so a genuinely poisoned request eventually surfaces for manual resolution.
     if (isTransient(e)) {
       const intentos = (op.intentos ?? 0) + 1;
-      if (intentos >= MAX_TRANSIENT_RETRIES) {
-        await db.operaciones.update(op.id, {
-          estado: "error",
-          intentos,
-          error: "No se pudo sincronizar tras varios intentos. Reintenta cuando la conexión sea estable.",
-        });
-        return { kind: "error" };
-      }
-      await db.operaciones.update(op.id, { estado: "pendiente", intentos });
+      // Never a terminal state: an outage longer than a few retries used to turn the head op of
+      // every site into `error`, each needing a manual retry (audit FE-14). Back off instead.
+      await db.operaciones.update(op.id, {
+        estado: "pendiente",
+        intentos,
+        nextAttemptAt: Date.now() + backoffMs(intentos),
+      });
       return { kind: "offline" };
     }
     await db.operaciones.update(op.id, { estado: "error", error: `${e.message} (${e.status})` });
@@ -323,6 +329,10 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
     const touched = new Set<number>();
     siteLoop: for (const [sitioId, ops] of bySite) {
       if (blockedSites.has(sitioId)) continue; // chain stays halted until the user resolves it
+      if ((ops[0]?.nextAttemptAt ?? 0) > Date.now()) {
+        outcome.offline = true; // backing off after a transient failure; try again later
+        continue;
+      }
       let etag = await resolveEtag(db, sitioId, ops[0]?.etagBase ?? "");
       for (const op of ops) {
         await db.operaciones.update(op.id, { estado: "enviando" });

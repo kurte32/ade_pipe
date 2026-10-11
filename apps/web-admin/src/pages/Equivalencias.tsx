@@ -44,8 +44,10 @@ export function Equivalencias() {
 
   const save = useMutation({
     mutationFn: async () => {
+      // Rows with a cleared email are sent as they are so the server rejects them per code,
+      // instead of being dropped while the page reports "saved" (audit FE-15).
       const body = rows
-        .filter((r) => r.usuario_codigo && r.correo)
+        .filter((r) => r.usuario_codigo || r.correo)
         .map((r) => ({ usuario_codigo: r.usuario_codigo.trim().toLowerCase(), correo: r.correo.trim(), activo: r.activo }));
       return (await api.put<EquivalenciaOut[]>("/api/v1/admin/equivalencias", body)).data;
     },

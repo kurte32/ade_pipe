@@ -24,6 +24,7 @@ export function Notificaciones() {
   return (
     <main className="narrow">
       <PageHeader title="Avisos" description={unread ? `${unread} sin leer` : undefined} />
+      {leer.isError ? <ProblemAlert error={leer.error} onRetry={() => leer.reset()} /> : null}
       {!online ? (
         <Alert tone="neutral" icon="wifi-off">
           Sin señal: se muestran los avisos guardados en el teléfono.

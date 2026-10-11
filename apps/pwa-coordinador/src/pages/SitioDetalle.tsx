@@ -58,9 +58,11 @@ export function SitioDetalle() {
   const requiredDocs = useMemo(() => requiredDocTypes(catalogos), [catalogos]);
   const motivos = useMemo(() => Object.fromEntries(catalogos.motivos_devolucion.map((m) => [m.codigo, m.nombre])), [catalogos]);
   const pendingTipos = useMemo(() => new Set(ops.filter((o) => o.estado !== "bloqueada").map((o) => o.tipo)), [ops]);
-  const pendingContacto = ops.find((o) => o.tipo === "contacto" && o.estado !== "bloqueada");
-  const pendingVisita = ops.find((o) => o.tipo === "visita" && o.estado !== "bloqueada");
-  const pendingTransicion = ops.find((o) => o.tipo === "transicion" && o.estado !== "bloqueada");
+  // The newest queued capture is the one the user will see sent (several edits may be queued).
+  const latest = (tipo: string) => [...ops].reverse().find((o) => o.tipo === tipo && o.estado !== "bloqueada" && o.estado !== "error");
+  const pendingContacto = latest("contacto");
+  const pendingVisita = latest("visita");
+  const pendingTransicion = latest("transicion");
 
   if (cached === undefined) return <Spinner label="Cargando sitio" />;
   if (cached === null) {

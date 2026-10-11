@@ -99,7 +99,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       } while (rerun.current);
       return last;
     };
-    const p = run().finally(() => {
+    // Two tabs (or the installed app plus a browser tab) share IndexedDB: a Web Lock keeps them
+    // from sending the same operation at once (audit FE-11). Without locks support, run as is.
+    const locked = async (): Promise<SyncOutcome | null> =>
+      typeof navigator !== "undefined" && navigator.locks
+        ? ((await navigator.locks.request("pipeline-sync", { ifAvailable: true }, (lock) => (lock ? run() : Promise.resolve(null)))) as SyncOutcome | null)
+        : run();
+    const p = locked().finally(() => {
       setSyncing(false);
       inFlight.current = null;
     });

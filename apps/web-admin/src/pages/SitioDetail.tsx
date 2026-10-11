@@ -116,7 +116,9 @@ export function SitioDetailPage() {
       ) : null}
       {s.en_revision_admin ? (
         <Alert tone="warning" title="Pendiente de tu decisión" role="none">
-          Una carga asignó este sitio a otro coordinador después de que ya había avanzado. Reasígnalo, devuélvelo o descártalo; mientras tanto el coordinador no puede avanzarlo.
+          {String(s.revision_detalle ?? "").startsWith("Propuesta de descarte")
+            ? "El coordinador propone descartar este sitio. Confírmalo con Descartar o devuélvelo con un motivo; mientras tanto no puede avanzarlo."
+            : "Una carga asignó este sitio a otro coordinador después de que ya había avanzado. Reasígnalo, devuélvelo o descártalo; mientras tanto el coordinador no puede avanzarlo."}
           {s.revision_detalle ? <p className="small">{String(s.revision_detalle)}</p> : null}
         </Alert>
       ) : null}
@@ -352,6 +354,7 @@ function Archivos({ archivos, docNames }: { archivos: ArchivoOut[]; docNames: Re
 
 function useAdminAction(sitioId: number, etag: string, onDone: (msg: string) => Promise<void>) {
   const api = useApi();
+  const qc = useQueryClient();
   const [error, setError] = useState<unknown>(null);
   const mutation = useMutation({
     mutationFn: async ({ action, body, msg }: { action: string; body: unknown; msg: string }) => {
@@ -359,7 +362,15 @@ function useAdminAction(sitioId: number, etag: string, onDone: (msg: string) => 
       return msg;
     },
     onSuccess: (msg) => void onDone(msg),
-    onError: (e) => setError(e),
+    onError: (e) => {
+      setError(e);
+      // A 412 means our copy is stale: reload it now so the next submit carries the current
+      // ETag, instead of looping on the same stale one (audit FE-7).
+      if (e instanceof ApiError && e.isPreconditionFailed) {
+        void qc.invalidateQueries({ queryKey: ["sitio", String(sitioId)] });
+        void qc.invalidateQueries({ queryKey: ["historial", String(sitioId)] });
+      }
+    },
   });
   const stale = error instanceof ApiError && error.isPreconditionFailed;
   return { mutation, error, stale };
@@ -369,7 +380,7 @@ function StaleOrError({ stale, error }: { stale: boolean; error: unknown }) {
   if (stale) {
     return (
       <Alert tone="error" title="El registro cambió desde que lo abriste">
-        Cierra el diálogo para recargar el sitio e inténtalo de nuevo.
+        El sitio se volvió a cargar con los datos actuales; revísalos e inténtalo de nuevo.
       </Alert>
     );
   }
