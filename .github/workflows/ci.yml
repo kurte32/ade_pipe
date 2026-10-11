@@ -203,3 +203,21 @@ jobs:
           sudo install -m 0755 /tmp/bicep /usr/local/bin/bicep
       - name: Validate templates and parameter files
         run: bash infra/bicep/validate.sh
+
+  workflows:
+    name: Workflow lint (actionlint)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install actionlint (pinned and checksum-verified)
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          f="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLO "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$f"
+          echo "${ACTIONLINT_SHA256}  $f" | sha256sum -c -
+          tar xzf "$f" actionlint
+      - name: Lint workflows (run blocks are also shell-checked when shellcheck is on the runner)
+        run: ./actionlint -color
