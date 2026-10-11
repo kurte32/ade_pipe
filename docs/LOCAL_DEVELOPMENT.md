@@ -3,6 +3,13 @@
 Everything runs on one machine without Azure credentials. The stack reproduces the production
 architecture with local substitutes (see `ENVIRONMENTS.md` for the differences).
 
+## Network timing (RNF-08)
+
+`make e2e-preview` leaves nothing running; to measure the first list on an emulated 4G/3G network,
+start the built PWA (`cd apps/pwa-coordinador && pnpm exec vite preview --outDir dist-preview --port 4173`)
+and run `cd e2e && node tools/net-timing.mjs`. Lighthouse: `npx lighthouse http://localhost:4173/`
+with `CHROME_PATH` pointing at the Playwright Chromium.
+
 ## Prerequisites
 
 | Tool | Version used | Notes |
