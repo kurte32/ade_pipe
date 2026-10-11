@@ -1,0 +1,5 @@
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.thumbs figure { margin: 0; width: 120px; }
+.thumb { width: 120px; height: 90px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--color-border); }
+figcaption { font-size: 0.75rem; }
+main h1 { word-break: break-word; }

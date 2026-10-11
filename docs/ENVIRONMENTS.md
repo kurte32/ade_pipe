@@ -1,0 +1,75 @@
+# Environments and configuration
+
+Three environments share one codebase. Business logic never branches on the environment; only
+adapters selected by configuration differ.
+
+| | Local development | Automated testing (CI) | Production (Azure) |
+|---|---|---|---|
+| Where | Developer machine, docker compose | GitHub Actions runner | Azure Container Apps |
+| Config source | `.env` (copied from `.env.example`) | `.env.example` values exported to the job | Bicep parameters, Container App env, Key Vault references |
+| Database | SQL Server 2022 container, SQL auth with `pipeline_app` | SQL Server 2022 container | Azure SQL Database, Entra-only auth, managed identity |
+| Storage | Azurite (both containers in one emulated account) | Azurite | Two storage accounts (flat staging, ADLS Gen2 documents) |
+| Identity | `tools/dev-idp` local OIDC issuer | `tools/dev-idp` | Microsoft Entra ID |
+| Malware scan | `SCAN_MODE=none` | `SCAN_MODE=none` | `SCAN_MODE=defender` |
+| Notifications | `NOTIFY_MODE=log` | `NOTIFY_MODE=log` | `NOTIFY_MODE=graph` (Teams activity feed) |
+| Directory | `DIRECTORY_MODE=dev` | `DIRECTORY_MODE=dev` | `DIRECTORY_MODE=graph` |
+| Telemetry | stdout JSON | stdout JSON | stdout JSON + Application Insights |
+| Jobs | `scheduler` compose service loop | run on demand in tests | Container Apps Jobs (cron) |
+
+`ENVIRONMENT=production` activates the guard in `backend/app/core/config.py`: the API refuses to start
+with any local substitute enabled.
+
+## Environment variables
+
+| Variable | Local (`.env`) | CI | Azure (source) |
+|---|---|---|---|
+| `ENVIRONMENT` | `local` | `local` | `production` (param `environmentName`; `test` env uses `test`) |
+| `LOG_LEVEL` | `INFO` | `INFO` | param `logLevel` |
+| `APP_PUBLIC_URL` | `http://localhost:5173` | same | param `appPublicUrl` (Front Door host) |
+| `DB_HOST` | `localhost` (compose sets `sqlserver` for containers) | `localhost` | SQL server FQDN (module output) |
+| `DB_PORT` | `1433` | `1433` | `1433` |
+| `DB_NAME` | `pipeline` | `pipeline` | `pipeline` |
+| `DB_AUTH` | `sql` | `sql` | `entra` |
+| `DB_USER` | `pipeline_app` | `pipeline_app` | API managed identity name |
+| `DB_PASSWORD` | dev value | dev value | not set (token auth) |
+| `DB_ADMIN_USER`, `DB_ADMIN_PASSWORD` | `sa` + dev value (db-init, migrations) | same | not set; the migration job uses the migration identity |
+| `AUTH_MODE` | `dev` | `dev` | `entra` |
+| `AUTH_TENANT_ID` | dev GUID | dev GUID | param `authTenantId` |
+| `AUTH_AUDIENCE` | dev GUID | dev GUID | param `authAudience` (pipeline-api client id) |
+| `AUTH_ALLOWED_AZP` | two dev GUIDs | same | param `authAllowedAzp` |
+| `AUTH_ISSUER` | `http://localhost:8001/<tenant>/v2.0` | same | `https://login.microsoftonline.com/<tenant>/v2.0` (computed) |
+| `AUTH_JWKS_URL` | dev-idp JWKS (compose overrides host) | `http://localhost:8001/...` | Entra discovery keys URL (computed) |
+| `DEV_IDP_URL` | `http://localhost:8001` | same | not set |
+| `STORAGE_MODE` | `azurite` | `azurite` | `azure` |
+| `STORAGE_BLOB_ENDPOINT`, `STORAGE_ACCOUNT_NAME`, `STORAGE_ACCOUNT_KEY` | Azurite well-known values | same | not set |
+| `STORAGE_STAGING_ACCOUNT_URL`, `STORAGE_DOCUMENTS_ACCOUNT_URL` | empty | empty | module outputs (blob endpoints) |
+| `STORAGE_STAGING_CONTAINER`, `STORAGE_DOCUMENTS_CONTAINER` | `staging`, `documents` | same | same |
+| `SCAN_MODE` | `none` | `none` | `defender` |
+| `NOTIFY_MODE` | `log` | `log` | `graph` |
+| `DIRECTORY_MODE` | `dev` | `dev` | `graph` |
+| `GRAPH_BASE_URL` | Graph v1.0 | same | param `graphBaseUrl` |
+| `TEAMS_APP_ID` | empty | empty | param `teamsAppId` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | empty | empty | Key Vault reference `appinsights-connection-string` |
+| `AZURE_CLIENT_ID` | not set | not set | user-assigned identity client id (selects the identity for `DefaultAzureCredential`) |
+| Limits (`PDF_MAX_BYTES`, `PDF_MAX_PAGES`, `UPLOAD_CHUNK_BYTES`, `PHOTO_MAX_BYTES`, `LOAD_MAX_ROWS`, `LOAD_MAX_BYTES`, `DUPLICATE_DISTANCE_METERS`, `SUSPICIOUS_NAME_WORDS`) | `.env.example` defaults | same | config.py defaults (add to `commonEnv` in `containerapps.bicep` to override) |
+| `RETENTION_YEARS` | default 5 | 5 | param `retentionYears` |
+
+Frontend build variables (`VITE_*`) are compile-time: local `.env.development` files in each app with
+`VITE_AUTH_MODE=dev`; CI and Azure builds set `VITE_AUTH_MODE=msal` and the tenant and client ids from
+GitHub environment variables.
+
+## Local substitutes and their limits
+
+| Azure service | Local substitute | Behavior verified locally | Differences and limitations |
+|---|---|---|---|
+| Azure SQL Database | SQL Server 2022 Developer (container) | RLS with `SESSION_CONTEXT`, `rowversion`, append-only ledger tables, same T-SQL | SQL authentication instead of Entra tokens; no automatic ledger digest storage; no PITR/LTR; `sa` exists (never used by the API after `db-init`) |
+| Azure Blob Storage (staging, flat) | Azurite blob service | Block staging, block list, commit, blob index tags, server-side copy, range reads | No Defender scanning; tags are set by the application in `SCAN_MODE=none`; no lifecycle rules (abandoned sessions are expired by the `expire_uploads` job instead) |
+| ADLS Gen2 (documents) | Same Azurite account, container `documents` | Blob API reads and writes; path layout `pipeline/{sitio}/{tipo}/...` | No hierarchical namespace, no immutability or legal hold, no soft delete by default, no OneLake shortcut; the Blob API is the only API used so code paths are identical |
+| Microsoft Entra ID | `tools/dev-idp` (local OIDC issuer) | RS256 tokens with Entra v2 claim shape, JWKS discovery, same validation code | No MFA, Conditional Access, refresh tokens or Intune; tokens are minted for any listed dev user; keys live in a docker volume |
+| Defender for Storage | `SCAN_MODE=none` | Promotion path, tag read, rejection path exercised with tags written by tests | No real malware detection; production refuses this mode |
+| Microsoft Teams via Graph | `NOTIFY_MODE=log` | Outbox table, retry, backoff and status transitions | Delivery is a structured log line, not a Teams message |
+| Microsoft Graph directory | `DIRECTORY_MODE=dev` (dev-idp `/users`) | Email to oid resolution through the same interface | No real tenant lookup; unknown emails fail the same way |
+| Managed identity | SQL login and Azurite account key | n/a | `DefaultAzureCredential` is only exercised in Azure |
+| Application Insights | disabled | stdout JSON logs with correlation ids | No traces or metrics export locally |
+| Container Apps Jobs | `scheduler` compose service | Same job entrypoints (`python -m app.jobs.run <name>`) | Interval loop instead of cron; one process for all jobs |
+| Front Door + WAF | Vite dev server proxy (`/api`, `/dev-idp`) | Same-origin routing as production | No WAF, no TLS, no rate limiting locally |

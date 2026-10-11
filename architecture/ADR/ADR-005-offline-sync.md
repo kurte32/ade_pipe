@@ -104,3 +104,14 @@ Cost: none beyond the `operacion_idempotente` table.
 - [ ] Implement `GET /sitios?desde=` with removed-site reporting.
 - [ ] Playwright offline tests: contact + transition chain, admin return mid-chain, duplicate replay.
 - [ ] Ratify `localStorage` with Seguridad; record in TDD 5.4.
+
+## Addendum (2026-10-10, implementation)
+
+- Implemented as designed in `apps/pwa-coordinador/src/sync`. One observed nuance: when a
+  non-transition write (contact or visit) precedes a transition in the same offline chain, the
+  write returns a fresh ETag, so a transition that is stale because of an admin return fails the
+  server's one-step rule with 422 rather than the precondition check with 412. The engine treats
+  both the same way: it blocks that site's chain, refreshes the site from the server, and shows
+  the server state in the conflict panel.
+- Background Sync is not used: the service worker cannot obtain tokens. Sync runs in the
+  foreground on start, on the `online` event, every 30 seconds, and after each enqueue.

@@ -3,7 +3,26 @@ node_modules/
 __pycache__/
 .env
 .env.*
+!apps/*/.env.development
+!.env.example
 *.log
 dist/
 spikes/**/local.settings.json
 .DS_Store
+# local
+.env
+backend/.venv/
+backend/.coverage
+backend/.coverage.*
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/htmlcov/
+**/node_modules/
+**/dist/
+**/.turbo/
+e2e/test-results/
+e2e/playwright-report/
+tools/dev-idp/*.pem
+docs/openapi.json.tmp
+*.tsbuildinfo

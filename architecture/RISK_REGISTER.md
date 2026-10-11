@@ -59,3 +59,29 @@ Probability medium: the TDD describes RLS on `sitio` "and its child tables" but 
 | Phase 4 exit | Documents and returns complete | R05, R09, R13, R16 |
 | Phase 5 exit, production readiness | Before go-live | All open risks re-scored; R04 and R15 formally accepted by Seguridad and Negocio; register attached to `PRODUCTION_READINESS.md` |
 | Steady state | Monthly | New risks from incidents, Defender for Cloud recommendations, cost review |
+
+## 4. Audit findings (2026-10-10)
+
+An independent adversarial audit added the risks below; full detail and evidence are in
+`docs/audit/` (`TECHNICAL_FINDINGS.md`, `RISK_REGISTER.md` prioritised view). These update two
+earlier entries: R24 (false conflicts on offline replay) — residual is no longer low, because E-1
+shows a transient 5xx wedges the chain with no auto-retry; and R06 (RLS child tables) — the planned
+trigger check does not exist (B-07).
+
+| ID | Risk | Severity | Urgency |
+|---|---|---|---|
+| B-01 | Optimistic concurrency checked in Python, not the UPDATE → silent lost update + duplicate ledger rows | Critical | Before any production claim |
+| D-01 | `.env.example` untracked → clean clone and CI backend job fail | High | Before any production claim |
+| E-1 | Transient 5xx permanently halts a coordinator's offline sync chain; no auto-retry | High | Before rollout |
+| D-02..D-06 | Deploy path broken: migrate-job KV grant, traffic-before-migrate, build-once-promote, release-tag skip, no CI gate | Medium | Before rollout |
+| B-02, B-03, B-04, B-05, B-06 | Idempotency concurrent dedup (500); delta >2100 ids (500); bulk-load/upload size enforced after full buffering; job batch rollback after blob delete | Medium | Before rollout / next cycle |
+| A1 | Production guard does not validate the JWKS URL | Medium | Before rollout |
+| A2, A5, B-07, D-07..D-12, C-series | Role string to session context; client headers in immutable ledger; missing trigger; dev public ingress; test coupling and coverage gaps; doc inaccuracies | Low | Next hardening cycle |
+
+Production-readiness gate: B-01 must be fixed and verified, and the deploy-path defects corrected and
+exercised in a real test subscription, before the register is attached to `PRODUCTION_READINESS.md`
+for go-live.
+
+**Remediation status (2026-10-10):** B-01, D-01, E-1, A1, A2, B-03 fixed and verified locally;
+D-02, D-05, D-08 fixed and statically validated; D-10, D-11, B-07 doc corrections applied. D-03, D-04,
+D-06, D-07 and the B-/A-/C- items listed above remain open. Detail in `docs/audit/REMEDIATION_PLAN.md`.

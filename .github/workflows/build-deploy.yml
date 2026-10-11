@@ -1,0 +1,161 @@
+name: build-deploy
+
+# Build once, promote the same image digest and SPA bundles through dev -> test -> prod (ADR-010).
+# Required GitHub configuration per environment (dev, test, prod):
+#   secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID (OIDC federated credential)
+#   vars:    ACR_NAME, RESOURCE_GROUP, VITE_TENANT_ID, VITE_SPA_CLIENT_ID_PWA, VITE_SPA_CLIENT_ID_ADMIN,
+#            VITE_API_CLIENT_ID, PUBLIC_HOST (Front Door or SWA host used for the smoke test)
+#   environments test and prod: required reviewers (release gate).
+# Rollback: the container app runs in multiple-revision mode; shift traffic back to the previous
+# revision with `az containerapp ingress traffic set` (see docs/AZURE_DEPLOYMENT.md section 9).
+# Re-running this workflow with a previous image digest is the fallback when the revision is gone.
+
+on:
+  push:
+    branches: [main]
+    tags: ["release-*"]
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: "Existing image digest to (re)deploy, e.g. sha256:abc... (leave empty to build)"
+        required: false
+        default: ""
+      target:
+        description: "Environment to deploy"
+        type: choice
+        options: [dev, test, prod]
+        default: dev
+
+permissions:
+  contents: read
+  id-token: write
+  packages: read
+
+env:
+  IMAGE_NAME: pipeline-api
+
+jobs:
+  build:
+    name: Build, scan and push image; build SPA bundles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: dev
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Reuse digest from input
+        id: reuse
+        if: ${{ inputs.image_digest != '' }}
+        run: echo "digest=${{ inputs.image_digest }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+        if: ${{ inputs.image_digest == '' }}
+
+      - name: Build image (local, for scanning)
+        if: ${{ inputs.image_digest == '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: INSTALL_DEV=false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image (Trivy, fail on CRITICAL)
+        if: ${{ inputs.image_digest == '' }}
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: table
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: ACR login
+        if: ${{ inputs.image_digest == '' }}
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      - name: Push image to ACR
+        if: ${{ inputs.image_digest == '' }}
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ vars.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: INSTALL_DEV=false
+          cache-from: type=gha
+
+      - name: Resolve digest
+        id: digest
+        run: |
+          if [ -n "${{ steps.reuse.outputs.digest }}" ]; then
+            echo "digest=${{ steps.reuse.outputs.digest }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "digest=${{ steps.push.outputs.digest }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build SPA bundles
+        env:
+          VITE_AUTH_MODE: msal
+          VITE_TENANT_ID: ${{ vars.VITE_TENANT_ID }}
+          VITE_API_CLIENT_ID: ${{ vars.VITE_API_CLIENT_ID }}
+          VITE_SPA_CLIENT_ID_PWA: ${{ vars.VITE_SPA_CLIENT_ID_PWA }}
+          VITE_SPA_CLIENT_ID_ADMIN: ${{ vars.VITE_SPA_CLIENT_ID_ADMIN }}
+        run: |
+          corepack enable && corepack prepare pnpm@12.11.2 --activate
+          pnpm install --frozen-lockfile
+          pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spa-bundles
+          path: |
+            apps/pwa-coordinador/dist
+            apps/web-admin/dist
+          if-no-files-found: error
+
+  deploy-dev:
+    name: Deploy dev
+    needs: build
+    if: ${{ github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.target == 'dev') }}
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: dev
+      image_digest: ${{ needs.build.outputs.digest }}
+    secrets: inherit
+
+  # Depend only on build and guard with a status function: depending on deploy-dev caused a
+  # cascade-skip on release tags (deploy-dev is skipped there), so test/prod deployed nothing
+  # (audit D-05). Promotion order to prod is enforced by the prod environment's required reviewers.
+  deploy-test:
+    name: Deploy test (UAT)
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' && (startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.target == 'test')) }}
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: test
+      image_digest: ${{ needs.build.outputs.digest }}
+    secrets: inherit
+
+  deploy-prod:
+    name: Deploy prod
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' && (startsWith(github.ref, 'refs/tags/release-') || (github.event_name == 'workflow_dispatch' && inputs.target == 'prod')) }}
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: prod
+      image_digest: ${{ needs.build.outputs.digest }}
+    secrets: inherit

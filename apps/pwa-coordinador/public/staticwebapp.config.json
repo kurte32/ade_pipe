@@ -1,0 +1,11 @@
+{
+  "navigationFallback": { "rewrite": "/index.html", "exclude": ["/assets/*", "/*.svg", "/*.json", "/sw.js", "/workbox-*.js", "/manifest.webmanifest"] },
+  "globalHeaders": {
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://login.microsoftonline.com; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(self), geolocation=(), microphone=()",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+  },
+  "responseOverrides": { "404": { "rewrite": "/index.html" } }
+}

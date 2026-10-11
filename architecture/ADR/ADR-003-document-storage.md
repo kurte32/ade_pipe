@@ -93,3 +93,17 @@ Cost: negligible storage; Defender scanning charged per GB uploaded; Event Grid 
 - [ ] Request Fabric trusted workspace access and workspace identity from the Fabric administrator.
 - [ ] Define lifecycle rules for staging and the purge job behaviour with legal holds.
 - [ ] Update TDD 4.2, 4.3, 9.2, 9.3, and 16 for v0.2.
+
+## Addendum (2026-10-10, implementation)
+
+- Blob versioning, and therefore version-level immutability, is not available on accounts with
+  hierarchical namespace. The Bicep template applies a container-level time-based immutability
+  policy on the `documents` container (`documentsImmutabilityDays`, 1826 in production, 0 in
+  dev) instead. Consequence: every blob in the container, including superseded document
+  versions, cannot be deleted or overwritten for five years from its creation; the purge job
+  skips protected blobs and logs them. Locking the policy is a manual, irreversible step that is
+  surfaced as a template output and must be performed only after Legal confirms the retention
+  start event (TDD pendiente 7). Not verified in Azure.
+- Local development uses Azurite, which has neither hierarchical namespace nor immutability.
+  The application uses only the Blob API so the code path is identical; retention enforcement
+  is validated statically only.

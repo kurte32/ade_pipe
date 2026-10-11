@@ -1,0 +1,14 @@
+[
+  {"code": "ard", "name": "Ana Rodríguez Díaz", "email": "ard@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000001", "roles": ["Coordinador"]},
+  {"code": "mmi", "name": "Mario Mireles Islas", "email": "mmi@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000002", "roles": ["Coordinador"]},
+  {"code": "jjt", "name": "Julia Jiménez Torres", "email": "jjt@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000003", "roles": ["Coordinador"]},
+  {"code": "jal", "name": "Jorge Alcántara López", "email": "jal@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000004", "roles": ["Coordinador"]},
+  {"code": "ede", "name": "Elena Durán Estrada", "email": "ede@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000005", "roles": ["Coordinador"]},
+  {"code": "cmc", "name": "Carlos Méndez Cruz", "email": "cmc@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000006", "roles": ["Coordinador"]},
+  {"code": "rsp", "name": "Rosa Salazar Pérez", "email": "rsp@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000007", "roles": ["Coordinador"]},
+  {"code": "usa", "name": "Ulises Sánchez Ávila", "email": "usa@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000008", "roles": ["Coordinador"]},
+  {"code": "bgl", "name": "Beatriz García Luna", "email": "bgl@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000009", "roles": ["Coordinador"]},
+  {"code": "jdc", "name": "Javier Delgado Castro", "email": "jdc@dev.tiendas3b.test", "oid": "a0000000-0000-4000-8000-000000000010", "roles": ["Coordinador"]},
+  {"code": "adm", "name": "Administrador Pipeline", "email": "admin@dev.tiendas3b.test", "oid": "b0000000-0000-4000-8000-000000000001", "roles": ["Admin"]},
+  {"code": "xna", "name": "Usuario Sin Rol", "email": "xna@dev.tiendas3b.test", "oid": "c0000000-0000-4000-8000-000000000001", "roles": []}
+]

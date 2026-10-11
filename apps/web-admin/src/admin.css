@@ -1,0 +1,24 @@
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: center;
+  justify-content: center; z-index: 10; padding: 16px;
+}
+.modal { width: 100%; max-width: 560px; max-height: 90vh; overflow: auto; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.cards .card { margin: 0; }
+.cards .card strong { font-size: 1.8rem; display: block; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+.filters label { margin-top: 0; min-width: 160px; flex: 1; }
+.filters input, .filters select { min-height: 40px; }
+.table-wrap { overflow-x: auto; }
+.nowrap { white-space: nowrap; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.78rem; margin-right: 4px; background: #eef1f5; }
+.tag-error { background: #fde7e5; color: var(--color-danger); }
+.tag-advertencia { background: #fff4e5; color: var(--color-warning); }
+.tag-ok { background: #e2f5ea; color: var(--color-success); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+dl.props { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
+dl.props dt { color: var(--color-muted); }
+dl.props dd { margin: 0; }
+pre.json { background: #f0f2f5; padding: 8px; border-radius: 6px; font-size: 0.8rem; overflow: auto; max-width: 600px; }
+.topbar nav a.active { font-weight: 700; text-decoration: underline; }
+.success { border: 1px solid var(--color-success); background: #eefaf3; color: var(--color-success); padding: 10px; border-radius: 8px; margin: 12px 0; }
