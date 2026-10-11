@@ -62,7 +62,19 @@ export function useAuth(): AuthState {
 }
 
 /** Sign-in screen. Dev mode shows the user picker; MSAL mode shows a single button. */
-export function SignIn({ title, requiredRole }: { title: string; requiredRole?: string }) {
+export function SignIn({
+  title,
+  requiredRole,
+  brand,
+  lede,
+}: {
+  title: string;
+  requiredRole?: string;
+  /** Brand block rendered above the title (the app passes its `<Brand/>`). */
+  brand?: ReactNode;
+  /** One sentence on what the app is for. */
+  lede?: string;
+}) {
   const { provider, login, account } = useAuth();
   const [users, setUsers] = useState<DevUser[]>([]);
   const [error, setError] = useState<string>("");
@@ -80,19 +92,21 @@ export function SignIn({ title, requiredRole }: { title: string; requiredRole?: 
 
   return (
     <main className="signin" aria-labelledby="signin-title">
+      {brand}
       <h1 id="signin-title">{title}</h1>
+      {lede ? <p className="lede">{lede}</p> : null}
       {wrongRole ? (
-        <p role="alert">
+        <p role="alert" className="problem">
           La cuenta {account?.username} no tiene el rol {requiredRole}. Cierra sesión e ingresa con otra cuenta.
         </p>
       ) : null}
       {provider.mode === "msal" ? (
-        <button type="button" onClick={() => void login().catch((e: Error) => setError(e.message))}>
+        <button type="button" className="block" onClick={() => void login().catch((e: Error) => setError(e.message))}>
           Iniciar sesión con cuenta corporativa
         </button>
       ) : (
         <div>
-          <p>Modo de desarrollo: elige un usuario.</p>
+          <p className="muted small">Modo de desarrollo: elige un usuario.</p>
           <ul className="dev-users">
             {users.map((u) => (
               <li key={u.code}>
@@ -101,14 +115,19 @@ export function SignIn({ title, requiredRole }: { title: string; requiredRole?: 
                   data-testid={`dev-user-${u.code}`}
                   onClick={() => void login(u.code).catch((e: Error) => setError(e.message))}
                 >
-                  {u.name} <small>({u.roles.join(", ") || "sin rol"})</small>
+                  <span>{u.name}</span>
+                  <small>{u.roles.join(", ") || "sin rol"}</small>
                 </button>
               </li>
             ))}
           </ul>
         </div>
       )}
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="problem">
+          {error}
+        </p>
+      ) : null}
     </main>
   );
 }

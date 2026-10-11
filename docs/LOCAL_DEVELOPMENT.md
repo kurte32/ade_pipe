@@ -51,6 +51,9 @@ catalogs), then the API with hot reload and the scheduler that runs the backgrou
 | `make openapi` | Export `docs/openapi.json`; then `pnpm gen:api` regenerates the TypeScript client types |
 | `make bicep-lint` | Static validation of the Azure templates |
 
+UX screenshots of every screen at phone and desktop width (used for `docs/ux/UX_VALIDATION.md`):
+`node e2e/tools/screenshots.mjs <outDir> [label]` with the stack and `pnpm dev` running.
+
 Frontend only: `pnpm --filter pwa-coordinador test`, `pnpm --filter web-admin build`, etc.
 Alternative without Node on the host: `make up-web` runs both Vite servers in containers.
 

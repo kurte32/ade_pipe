@@ -1,3 +1,4 @@
+import { Icon } from "@pipeline/ui";
 import { useEffect, useState } from "react";
 
 import { useApi } from "../api";
@@ -39,7 +40,7 @@ function RemoteThumb({ archivoId, alt }: { archivoId: string; alt: string }) {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [api, archivoId]);
-  if (failed) return <span className="muted">(sin conexión)</span>;
+  if (failed) return <span className="muted small">(sin conexión)</span>;
   return url ? <img src={url} alt={alt} className="thumb" data-testid={`foto-${archivoId}`} /> : <span className="muted">…</span>;
 }
 
@@ -69,38 +70,51 @@ export function FotosSection({ sitioId, publicadas, disabled }: { sitioId: numbe
     }
   }
 
+  const total = (locales?.length ?? 0) + publicadas.length;
+
   return (
     <section aria-labelledby="fotos-h">
-      <h2 id="fotos-h">Fotos del inmueble</h2>
-      <p className="muted">Opcionales. Se comprimen en el teléfono y se envían al sincronizar.</p>
-      <label htmlFor="foto-input" className="button" style={{ display: "inline-block" }}>
-        {busy ? "Procesando…" : "Tomar o elegir foto"}
-      </label>
-      <input
-        id="foto-input"
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={(e) => void onFile(e)}
-        disabled={busy || disabled}
-        style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}
-        data-testid="foto-input"
-      />
-      {error ? <p role="alert" className="problem">{error}</p> : null}
-      <div className="thumbs">
-        {(locales ?? []).map((f) => (
-          <figure key={f.id} data-testid="foto-local">
-            <LocalThumb blob={f.blob} alt={f.nombre} />
-            <figcaption className="pending">pendiente de sincronizar</figcaption>
-          </figure>
-        ))}
-        {publicadas.map((a) => (
-          <figure key={a.id}>
-            <RemoteThumb archivoId={a.id} alt={a.nombre_original} />
-            <figcaption className="muted">{a.nombre_original}</figcaption>
-          </figure>
-        ))}
+      <div className="card-head">
+        <h2 id="fotos-h">Fotos del inmueble</h2>
+        {total ? <span className="tag tag-muted">{total}</span> : null}
       </div>
+      <p className="section-sub">Opcionales. Se comprimen en el teléfono y se envían al sincronizar, también sin señal.</p>
+      <span className="file-button">
+        <span className="button secondary" aria-hidden="true">
+          <Icon name="camera" size={18} /> {busy ? "Procesando…" : "Tomar o elegir foto"}
+        </span>
+        <input
+          id="foto-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          aria-label="Tomar o elegir foto"
+          onChange={(e) => void onFile(e)}
+          disabled={busy || disabled}
+          data-testid="foto-input"
+        />
+      </span>
+      {error ? (
+        <p role="alert" className="problem">
+          {error}
+        </p>
+      ) : null}
+      {total ? (
+        <div className="thumbs">
+          {(locales ?? []).map((f) => (
+            <figure key={f.id} data-testid="foto-local">
+              <LocalThumb blob={f.blob} alt={f.nombre} />
+              <figcaption className="pending">pendiente de sincronizar</figcaption>
+            </figure>
+          ))}
+          {publicadas.map((a) => (
+            <figure key={a.id}>
+              <RemoteThumb archivoId={a.id} alt={a.nombre_original} />
+              <figcaption>{a.nombre_original}</figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

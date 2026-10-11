@@ -1,5 +1,5 @@
 import { SignIn, useAuth } from "@pipeline/auth/react";
-import { Spinner } from "@pipeline/ui";
+import { Brand, Spinner } from "@pipeline/ui";
 import { useEffect, useState } from "react";
 import { Route, Routes } from "react-router-dom";
 
@@ -19,7 +19,14 @@ export function App() {
 
   if (!ready) return <Spinner label="Iniciando" />;
   if (!account || !account.roles.includes("Coordinador") || forceSignIn) {
-    return <SignIn title="Pipeline de Posibles Tiendas" requiredRole="Coordinador" />;
+    return (
+      <SignIn
+        title="Iniciar sesión"
+        requiredRole="Coordinador"
+        brand={<Brand area="Coordinador" />}
+        lede="Captura el contacto, las medidas, las fotos y los documentos de tus sitios candidatos, con o sin señal."
+      />
+    );
   }
   return (
     <SyncProvider>

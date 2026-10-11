@@ -1,17 +1,9 @@
-import { ESTATUS_LABELS, formatMexicoCity } from "@pipeline/ui";
+import { ESTATUS_LABELS, HISTORIAL_TIPO, Icon, formatMexicoCity, label } from "@pipeline/ui";
 import { useQuery } from "@tanstack/react-query";
 
 import { useApi } from "../api";
 import type { HistorialItem } from "../lib/types";
 import { useSync } from "../sync/context";
-
-const TIPO: Record<string, string> = {
-  avance: "Avance",
-  devolucion: "Devolución",
-  carga: "Carga",
-  reasignacion: "Reasignación",
-  descarte: "Descarte",
-};
 
 export function HistorialList({ sitioId, refreshKey }: { sitioId: number; refreshKey: string }) {
   const api = useApi();
@@ -22,20 +14,27 @@ export function HistorialList({ sitioId, refreshKey }: { sitioId: number; refres
     enabled: online,
     retry: 0,
   });
+  const items = q.data ?? [];
   return (
     <section aria-labelledby="hist-h">
       <h2 id="hist-h">Historial</h2>
-      {!online ? <p className="muted">El historial se consulta con conexión.</p> : null}
-      {q.isError ? <p className="muted">No se pudo cargar el historial.</p> : null}
-      <ul className="list" data-testid="historial">
-        {(q.data ?? []).map((h) => (
-          <li key={h.id} style={{ padding: 10 }}>
-            <strong>{TIPO[h.tipo] ?? h.tipo}</strong>: {h.estatus_anterior ? `${ESTATUS_LABELS[h.estatus_anterior] ?? h.estatus_anterior} → ` : ""}
-            {ESTATUS_LABELS[h.estatus_nuevo] ?? h.estatus_nuevo}
-            <div className="muted">
-              {formatMexicoCity(h.fecha_utc)}
-              {h.motivo ? ` · ${h.motivo}` : ""}
-              {h.comentario ? ` · ${h.comentario}` : ""}
+      {!online ? <p className="muted small">El historial se consulta con señal.</p> : null}
+      {q.isError ? <p className="muted small">No se pudo cargar el historial.</p> : null}
+      {online && q.isSuccess && items.length === 0 ? <p className="muted small">Sin movimientos todavía.</p> : null}
+      <ul className="hist" data-testid="historial">
+        {items.map((h) => (
+          <li key={h.id}>
+            <Icon name={h.tipo === "devolucion" ? "alert-circle" : h.tipo === "carga" ? "upload" : "check"} size={16} />
+            <div>
+              <strong>{label(HISTORIAL_TIPO, h.tipo)}</strong>
+              {": "}
+              {h.estatus_anterior ? `${ESTATUS_LABELS[h.estatus_anterior] ?? h.estatus_anterior} → ` : ""}
+              {ESTATUS_LABELS[h.estatus_nuevo] ?? h.estatus_nuevo}
+              <div className="when">
+                {formatMexicoCity(h.fecha_utc)}
+                {h.motivo ? ` · ${h.motivo}` : ""}
+                {h.comentario ? ` · ${h.comentario}` : ""}
+              </div>
             </div>
           </li>
         ))}

@@ -1,11 +1,29 @@
 import { ApiError } from "@pipeline/api-client";
-import { ESTATUS_LABELS, EstatusBadge, ProblemAlert, Spinner, formatMexicoCity } from "@pipeline/ui";
+import {
+  Alert,
+  ESTATUS_LABELS,
+  EstatusBadge,
+  Field,
+  HISTORIAL_ORIGEN,
+  HISTORIAL_TIPO,
+  Icon,
+  Modal,
+  PageHeader,
+  ProblemAlert,
+  Spinner,
+  StageIndicator,
+  formatMb,
+  formatMexicoCity,
+  label,
+  potencialLabel,
+  usePageTitle,
+} from "@pipeline/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { useApi } from "../api";
-import { Modal } from "../components/Modal";
+import { useCoordinadores, useEquivalencias } from "../lib/equivalencias";
 import { esTerminal, estatusAnteriores } from "../lib/estatus";
 import type { ArchivoOut, Catalogos, EquivalenciaOut, HistorialItem, SitioDetail } from "../lib/types";
 
@@ -15,6 +33,7 @@ export function SitioDetailPage() {
   const { id } = useParams();
   const api = useApi();
   const qc = useQueryClient();
+  const coords = useCoordinadores();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [flash, setFlash] = useState<string>("");
 
@@ -29,10 +48,8 @@ export function SitioDetailPage() {
     enabled: !!id,
   });
   const catalogos = useQuery({ queryKey: ["catalogos"], queryFn: () => api.get<Catalogos>("/api/v1/catalogos") });
-  const equivalencias = useQuery({
-    queryKey: ["equivalencias"],
-    queryFn: () => api.get<EquivalenciaOut[]>("/api/v1/admin/equivalencias"),
-  });
+  const equivalencias = useEquivalencias();
+  usePageTitle(detail.data?.nombre ?? "Sitio");
 
   const invalidate = async () => {
     await Promise.all([
@@ -47,130 +64,149 @@ export function SitioDetailPage() {
   if (detail.isError) return <ProblemAlert error={detail.error} onRetry={() => void detail.refetch()} />;
   const s = detail.data;
   const terminal = esTerminal(s.estatus);
+  const anteriores = estatusAnteriores(s.estatus);
+  const motivos = Object.fromEntries((catalogos.data?.motivos_devolucion ?? []).map((m) => [m.codigo, m.nombre]));
+  const docNames = Object.fromEntries((catalogos.data?.tipos_documento ?? []).map((t) => [t.id, t.nombre]));
+  const coordinador = coords.byCode[s.usuario_codigo];
+  const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${s.lat},${s.lon}`)}`;
+
+  const why =
+    terminal ? "El sitio está en un estatus final; ya no admite acciones." : anteriores.length === 0 ? "Está en la primera etapa: no hay un estatus anterior al cual devolverlo." : null;
 
   return (
     <main>
-      <p>
-        <Link to="/sitios">← Sitios</Link>
-      </p>
-      <h1>
-        {s.nombre} <span className="muted">#{s.origen_id}</span>
-      </h1>
-      <div className="row">
-        <EstatusBadge estatus={s.estatus} devuelto={s.devuelto} />
-        {s.en_revision_admin ? <span className="tag tag-advertencia">en revisión del administrador</span> : null}
-        {!s.vigente ? <span className="tag">no vigente</span> : null}
-      </div>
-      {flash ? <div className="success" role="status">{flash}</div> : null}
+      <PageHeader
+        back={
+          <Link to="/sitios" className="back-link">
+            <Icon name="arrow-left" size={16} /> Sitios
+          </Link>
+        }
+        title={
+          <>
+            {s.nombre} <span className="muted">#{s.origen_id}</span>
+          </>
+        }
+        actions={
+          <>
+            <button type="button" disabled={terminal || anteriores.length === 0} onClick={() => setDialog("devolver")}>
+              <Icon name="arrow-left" size={16} /> Devolver
+            </button>
+            <button type="button" className="secondary" disabled={terminal} onClick={() => setDialog("reasignar")}>
+              <Icon name="users" size={16} /> Reasignar
+            </button>
+            <button type="button" className="danger" disabled={terminal} onClick={() => setDialog("descartar")}>
+              <Icon name="trash" size={16} /> Descartar
+            </button>
+          </>
+        }
+      >
+        <div className="cluster" style={{ margin: "var(--space-2) 0" }}>
+          <EstatusBadge estatus={s.estatus} devuelto={s.devuelto} />
+          {s.en_revision_admin ? <span className="tag tag-warning">en revisión del administrador</span> : null}
+          {!s.vigente ? <span className="tag tag-muted">no vigente</span> : null}
+        </div>
+        <StageIndicator estatus={s.estatus} />
+        {why ? <p className="helper" style={{ marginTop: "var(--space-2)" }}>{why}</p> : null}
+      </PageHeader>
 
-      <div className="actions">
-        <button
-          type="button"
-          disabled={terminal || estatusAnteriores(s.estatus).length === 0}
-          title={
-            terminal
-              ? "El sitio está en un estatus terminal."
-              : estatusAnteriores(s.estatus).length === 0
-                ? "El sitio está en el primer estatus; no hay un estatus anterior al cual devolverlo."
-                : undefined
-          }
-          onClick={() => setDialog("devolver")}
-        >
-          Devolver
-        </button>
-        <button type="button" className="danger" disabled={terminal} onClick={() => setDialog("descartar")}>
-          Descartar
-        </button>
-        <button type="button" className="secondary" disabled={terminal} onClick={() => setDialog("reasignar")}>
-          Reasignar
-        </button>
-      </div>
+      {flash ? (
+        <Alert tone="success" onClose={() => setFlash("")}>
+          {flash}
+        </Alert>
+      ) : null}
+      {s.en_revision_admin ? (
+        <Alert tone="warning" title="Pendiente de tu decisión" role="none">
+          Una carga asignó este sitio a otro coordinador después de que ya había avanzado. Reasígnalo, devuélvelo o descártalo; mientras tanto el coordinador no puede avanzarlo.
+          {s.revision_detalle ? <p className="small">{String(s.revision_detalle)}</p> : null}
+        </Alert>
+      ) : null}
+      {s.devuelto ? (
+        <Alert tone="error" title="Devuelto al coordinador" role="none">
+          <span data-testid="detail-devolucion">
+            {motivos[s.devolucion_motivo ?? ""] ?? s.devolucion_motivo}
+            {s.devolucion_comentario ? ` · ${s.devolucion_comentario}` : ""}
+          </span>
+        </Alert>
+      ) : null}
 
-      <section className="card">
-        <h2>Datos del sitio</h2>
-        <dl className="props">
-          <dt>Región</dt>
-          <dd>{s.region}</dd>
-          <dt>Coordinador</dt>
-          <dd data-testid="detail-coordinador">
-            {s.usuario_codigo} <span className="muted">{s.coordinador_oid}</span>
-          </dd>
-          <dt>Coordenadas</dt>
-          <dd>
-            {s.lat}, {s.lon}
-          </dd>
-          <dt>GPS (sin interpretar)</dt>
-          <dd>{s.gps_texto ?? "—"}</dd>
-          <dt>Potencial</dt>
-          <dd>{s.potencial}</dd>
-          <dt>Campos</dt>
-          <dd>
-            {s.campos_capturados}/{s.campos_total}
-          </dd>
-          <dt>Fecha origen</dt>
-          <dd>{formatMexicoCity(s.fecha_origen_utc)}</dd>
-          <dt>Actualizado</dt>
-          <dd>{formatMexicoCity(s.actualizado_utc)}</dd>
-          {s.devuelto ? (
-            <>
-              <dt>Devolución</dt>
-              <dd data-testid="detail-devolucion">
-                {s.devolucion_motivo}: {s.devolucion_comentario}
-              </dd>
-            </>
-          ) : null}
-          {s.en_revision_admin ? (
-            <>
-              <dt>Revisión</dt>
-              <dd>Pendiente de decisión del administrador (reasignar, devolver o descartar).</dd>
-            </>
-          ) : null}
-        </dl>
-      </section>
-
-      <section className="card">
-        <h2>Contacto del dueño</h2>
-        {s.contacto ? (
+      <div className="two-col">
+        <section className="card">
+          <h2>Datos del sitio</h2>
           <dl className="props">
-            <dt>Nombre</dt>
-            <dd>{s.contacto.nombre}</dd>
-            <dt>Teléfono</dt>
-            <dd>{s.contacto.telefono}</dd>
-            <dt>Correo</dt>
-            <dd>{s.contacto.correo ?? "—"}</dd>
-            <dt>Notas</dt>
-            <dd>{s.contacto.notas ?? "—"}</dd>
-            <dt>Capturado</dt>
-            <dd>{formatMexicoCity(s.contacto.capturado_utc)}</dd>
+            <dt>Región</dt>
+            <dd>{s.region}</dd>
+            <dt>Coordinador</dt>
+            <dd data-testid="detail-coordinador" title={s.coordinador_oid ?? undefined}>
+              {s.usuario_codigo}
+              {coordinador?.nombre ? ` · ${coordinador.nombre}` : ""}
+            </dd>
+            <dt>Ubicación</dt>
+            <dd>
+              {s.lat}, {s.lon}{" "}
+              <a href={mapsHref} target="_blank" rel="noopener noreferrer">
+                Abrir en el mapa <Icon name="external" size={12} />
+              </a>
+            </dd>
+            <dt>GPS del archivo</dt>
+            <dd>{s.gps_texto ?? "—"}</dd>
+            <dt>Potencial</dt>
+            <dd>{potencialLabel(s.potencial)}</dd>
+            <dt>Campos</dt>
+            <dd title="Campos con dato en el archivo de origen">
+              {s.campos_capturados}/{s.campos_total}
+            </dd>
+            <dt>Fecha origen</dt>
+            <dd>{formatMexicoCity(s.fecha_origen_utc)}</dd>
+            <dt>Actualizado</dt>
+            <dd>{formatMexicoCity(s.actualizado_utc)}</dd>
           </dl>
-        ) : (
-          <p className="muted">Sin contacto capturado.</p>
-        )}
-      </section>
+        </section>
 
-      <section className="card">
-        <h2>Primera visita</h2>
-        {s.visita ? (
-          <dl className="props">
-            <dt>Frente</dt>
-            <dd>{s.visita.frente_m} m</dd>
-            <dt>Fondo</dt>
-            <dd>{s.visita.fondo_m} m</dd>
-            <dt>Área</dt>
-            <dd>{s.visita.area_m2 ? `${s.visita.area_m2} m²` : "—"}</dd>
-            <dt>Fecha</dt>
-            <dd>{formatMexicoCity(s.visita.fecha_visita_utc)}</dd>
-            <dt>Notas</dt>
-            <dd>{s.visita.notas ?? "—"}</dd>
-          </dl>
-        ) : (
-          <p className="muted">Sin medidas capturadas.</p>
-        )}
-      </section>
+        <div className="stack">
+          <section className="card">
+            <h2>Contacto del dueño</h2>
+            {s.contacto ? (
+              <dl className="props">
+                <dt>Nombre</dt>
+                <dd>{s.contacto.nombre}</dd>
+                <dt>Teléfono</dt>
+                <dd>{s.contacto.telefono}</dd>
+                <dt>Correo</dt>
+                <dd>{s.contacto.correo ?? "—"}</dd>
+                <dt>Notas</dt>
+                <dd>{s.contacto.notas ?? "—"}</dd>
+                <dt>Capturado</dt>
+                <dd>{formatMexicoCity(s.contacto.capturado_utc)}</dd>
+              </dl>
+            ) : (
+              <p className="muted">Sin contacto capturado.</p>
+            )}
+          </section>
+          <section className="card">
+            <h2>Primera visita</h2>
+            {s.visita ? (
+              <dl className="props">
+                <dt>Frente</dt>
+                <dd>{s.visita.frente_m} m</dd>
+                <dt>Fondo</dt>
+                <dd>{s.visita.fondo_m} m</dd>
+                <dt>Área</dt>
+                <dd>{s.visita.area_m2 ? `${s.visita.area_m2} m²` : "—"}</dd>
+                <dt>Fecha</dt>
+                <dd>{formatMexicoCity(s.visita.fecha_visita_utc)}</dd>
+                <dt>Notas</dt>
+                <dd>{s.visita.notas ?? "—"}</dd>
+              </dl>
+            ) : (
+              <p className="muted">Sin medidas capturadas.</p>
+            )}
+          </section>
+        </div>
+      </div>
 
-      <section className="card">
+      <section className="card" style={{ marginTop: "var(--space-3)" }}>
         <h2>Archivos</h2>
-        {s.archivos.length === 0 ? <p className="muted">Sin archivos.</p> : <Archivos archivos={s.archivos} />}
+        {s.archivos.length === 0 ? <p className="muted">Sin fotos ni documentos todavía.</p> : <Archivos archivos={s.archivos} docNames={docNames} />}
       </section>
 
       <section className="card">
@@ -181,25 +217,25 @@ export function SitioDetailPage() {
             <table data-testid="historial">
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>De</th>
-                  <th>A</th>
-                  <th>Motivo</th>
-                  <th>Comentario</th>
-                  <th>Origen</th>
+                  <th scope="col">Fecha</th>
+                  <th scope="col">Movimiento</th>
+                  <th scope="col">De</th>
+                  <th scope="col">A</th>
+                  <th scope="col">Motivo</th>
+                  <th scope="col">Comentario</th>
+                  <th scope="col">Origen</th>
                 </tr>
               </thead>
               <tbody>
                 {historial.data.map((h) => (
                   <tr key={h.id}>
                     <td className="nowrap">{formatMexicoCity(h.fecha_utc)}</td>
-                    <td>{h.tipo}</td>
-                    <td>{h.estatus_anterior ? ESTATUS_LABELS[h.estatus_anterior] ?? h.estatus_anterior : "—"}</td>
+                    <td>{label(HISTORIAL_TIPO, h.tipo)}</td>
+                    <td>{h.estatus_anterior ? (ESTATUS_LABELS[h.estatus_anterior] ?? h.estatus_anterior) : "—"}</td>
                     <td>{ESTATUS_LABELS[h.estatus_nuevo] ?? h.estatus_nuevo}</td>
-                    <td>{h.motivo ?? ""}</td>
+                    <td>{h.motivo ? (motivos[h.motivo] ?? h.motivo) : ""}</td>
                     <td>{h.comentario ?? ""}</td>
-                    <td>{h.origen}</td>
+                    <td>{label(HISTORIAL_ORIGEN, h.origen)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -212,6 +248,7 @@ export function SitioDetailPage() {
         <DevolverDialog
           sitio={s}
           catalogos={catalogos.data}
+          coordinador={coordinador?.nombre ?? s.usuario_codigo}
           onClose={() => setDialog(null)}
           onDone={async (msg) => {
             setDialog(null);
@@ -248,7 +285,7 @@ export function SitioDetailPage() {
   );
 }
 
-function Archivos({ archivos }: { archivos: ArchivoOut[] }) {
+function Archivos({ archivos, docNames }: { archivos: ArchivoOut[]; docNames: Record<string, string> }) {
   const api = useApi();
   const [error, setError] = useState<unknown>(null);
   const download = async (a: ArchivoOut) => {
@@ -272,31 +309,36 @@ function Archivos({ archivos }: { archivos: ArchivoOut[] }) {
         <table>
           <thead>
             <tr>
-              <th>Tipo</th>
-              <th>Documento</th>
-              <th>Archivo</th>
-              <th>Tamaño</th>
-              <th>Páginas</th>
-              <th>Versión</th>
-              <th>Vigente</th>
-              <th>Subido</th>
-              <th></th>
+              <th scope="col">Tipo</th>
+              <th scope="col">Archivo</th>
+              <th scope="col" className="num">
+                Tamaño
+              </th>
+              <th scope="col" className="num">
+                Páginas
+              </th>
+              <th scope="col">Versión</th>
+              <th scope="col">Subido</th>
+              <th scope="col">
+                <span className="visually-hidden">Acciones</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {archivos.map((a) => (
               <tr key={a.id}>
-                <td>{a.tipo}</td>
-                <td>{a.tipo_documento ?? "—"}</td>
-                <td>{a.nombre_original}</td>
-                <td className="nowrap">{(a.bytes / 1024 / 1024).toFixed(2)} MB</td>
-                <td>{a.paginas ?? "—"}</td>
-                <td>{a.version}</td>
-                <td>{a.vigente ? "sí" : "no"}</td>
+                <td>
+                  {a.tipo === "foto" ? "Foto" : (docNames[a.tipo_documento ?? ""] ?? a.tipo_documento ?? "Documento")}
+                  {!a.vigente ? <span className="tag tag-muted" style={{ marginLeft: 6 }}>anterior</span> : null}
+                </td>
+                <td style={{ overflowWrap: "anywhere" }}>{a.nombre_original}</td>
+                <td className="num nowrap">{formatMb(a.bytes)}</td>
+                <td className="num">{a.paginas ?? "—"}</td>
+                <td>v{a.version}</td>
                 <td className="nowrap">{formatMexicoCity(a.subido_utc)}</td>
                 <td>
-                  <button type="button" className="secondary" onClick={() => void download(a)}>
-                    Descargar
+                  <button type="button" className="ghost small" onClick={() => void download(a)}>
+                    <Icon name="download" size={16} /> Descargar
                   </button>
                 </td>
               </tr>
@@ -323,14 +365,27 @@ function useAdminAction(sitioId: number, etag: string, onDone: (msg: string) => 
   return { mutation, error, stale };
 }
 
+function StaleOrError({ stale, error }: { stale: boolean; error: unknown }) {
+  if (stale) {
+    return (
+      <Alert tone="error" title="El registro cambió desde que lo abriste">
+        Cierra el diálogo para recargar el sitio e inténtalo de nuevo.
+      </Alert>
+    );
+  }
+  return <ProblemAlert error={error} />;
+}
+
 function DevolverDialog({
   sitio,
   catalogos,
+  coordinador,
   onClose,
   onDone,
 }: {
   sitio: SitioDetail;
   catalogos: Catalogos;
+  coordinador: string;
   onClose: () => void;
   onDone: (msg: string) => Promise<void>;
 }) {
@@ -344,14 +399,19 @@ function DevolverDialog({
     mutation.mutate({
       action: "devolver",
       body: { estatus_destino: destino, motivo, comentario },
-      msg: `Sitio devuelto a ${ESTATUS_LABELS[destino] ?? destino}. El coordinador recibirá el aviso.`,
+      msg: `Sitio devuelto a ${ESTATUS_LABELS[destino] ?? destino}. ${coordinador} recibirá el aviso.`,
     });
   };
   return (
-    <Modal title="Devolver a un estatus anterior" onClose={onClose} testId="dialog-devolver">
+    <Modal
+      title="Devolver a un estatus anterior"
+      lede={`${sitio.nombre} regresa a la etapa que elijas y ${coordinador} recibe un aviso con el motivo y tu comentario.`}
+      onClose={onClose}
+      testId="dialog-devolver"
+      dismissOnBackdrop={comentario.length === 0}
+    >
       <form onSubmit={submit}>
-        <label>
-          Estatus destino
+        <Field id="dv-destino" label="Estatus destino">
           <select value={destino} onChange={(e) => setDestino(e.target.value)} name="estatus_destino" required>
             {anteriores.map((k) => (
               <option key={k} value={k}>
@@ -359,9 +419,8 @@ function DevolverDialog({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Motivo
+        </Field>
+        <Field id="dv-motivo" label="Motivo">
           <select value={motivo} onChange={(e) => setMotivo(e.target.value)} name="motivo" required>
             {catalogos.motivos_devolucion.map((m) => (
               <option key={m.codigo} value={m.codigo}>
@@ -369,32 +428,17 @@ function DevolverDialog({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Comentario para el coordinador (mínimo 5 caracteres)
-          <textarea
-            name="comentario"
-            value={comentario}
-            minLength={5}
-            maxLength={1000}
-            required
-            rows={3}
-            onChange={(e) => setComentario(e.target.value)}
-          />
-        </label>
-        {stale ? (
-          <p role="alert" className="problem">
-            El registro cambió desde que lo abriste. Cierra el diálogo para recargarlo e inténtalo de nuevo.
-          </p>
-        ) : (
-          <ProblemAlert error={error} />
-        )}
+        </Field>
+        <Field id="dv-comentario" label="Comentario para el coordinador" hint="Qué debe corregir. Mínimo 5 caracteres.">
+          <textarea name="comentario" value={comentario} minLength={5} maxLength={1000} required rows={3} onChange={(e) => setComentario(e.target.value)} />
+        </Field>
+        <StaleOrError stale={stale} error={error} />
         <div className="actions">
-          <button type="submit" disabled={mutation.isPending || comentario.trim().length < 5}>
-            Devolver
-          </button>
-          <button type="button" className="secondary" onClick={onClose}>
+          <button type="button" className="ghost" onClick={onClose}>
             Cancelar
+          </button>
+          <button type="submit" disabled={mutation.isPending || comentario.trim().length < 5}>
+            {mutation.isPending ? "Devolviendo…" : "Devolver"}
           </button>
         </div>
       </form>
@@ -417,16 +461,20 @@ function DescartarDialog({
   const [comentario, setComentario] = useState("");
   const { mutation, error, stale } = useAdminAction(sitio.id, sitio.etag, onDone);
   return (
-    <Modal title="Descartar sitio" onClose={onClose} testId="dialog-descartar">
+    <Modal
+      title="Descartar sitio"
+      lede={`${sitio.nombre} pasa al estatus final Descartado y sale del pipeline. Los datos capturados se conservan. No se puede deshacer desde la aplicación.`}
+      onClose={onClose}
+      testId="dialog-descartar"
+      dismissOnBackdrop={comentario.length === 0}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
           mutation.mutate({ action: "descartar", body: { motivo, comentario }, msg: "Sitio descartado." });
         }}
       >
-        <p>El sitio pasa al estatus terminal Descartado. Los datos capturados se conservan.</p>
-        <label>
-          Motivo
+        <Field id="ds-motivo" label="Motivo">
           <select value={motivo} onChange={(e) => setMotivo(e.target.value)} name="motivo" required>
             {catalogos.motivos_devolucion.map((m) => (
               <option key={m.codigo} value={m.codigo}>
@@ -434,18 +482,17 @@ function DescartarDialog({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Comentario (mínimo 5 caracteres)
+        </Field>
+        <Field id="ds-comentario" label="Comentario" hint="Mínimo 5 caracteres. Queda en el historial del sitio.">
           <textarea name="comentario" value={comentario} minLength={5} required rows={3} onChange={(e) => setComentario(e.target.value)} />
-        </label>
-        {stale ? <p role="alert" className="problem">El registro cambió. Recarga e inténtalo de nuevo.</p> : <ProblemAlert error={error} />}
+        </Field>
+        <StaleOrError stale={stale} error={error} />
         <div className="actions">
-          <button type="submit" className="danger" disabled={mutation.isPending || comentario.trim().length < 5}>
-            Descartar
-          </button>
-          <button type="button" className="secondary" onClick={onClose}>
+          <button type="button" className="ghost" onClick={onClose}>
             Cancelar
+          </button>
+          <button type="submit" className="danger" disabled={mutation.isPending || comentario.trim().length < 5}>
+            {mutation.isPending ? "Descartando…" : "Descartar sitio"}
           </button>
         </div>
       </form>
@@ -467,8 +514,14 @@ function ReasignarDialog({
   const candidates = equivalencias.filter((e) => e.activo && e.oid && e.oid !== sitio.coordinador_oid);
   const [oid, setOid] = useState(candidates[0]?.oid ?? "");
   const { mutation, error, stale } = useAdminAction(sitio.id, sitio.etag, onDone);
+  const actual = equivalencias.find((e) => e.oid === sitio.coordinador_oid);
   return (
-    <Modal title="Reasignar coordinador" onClose={onClose} testId="dialog-reasignar">
+    <Modal
+      title="Reasignar coordinador"
+      lede={`Hoy ${sitio.nombre} está asignado a ${actual?.nombre ?? sitio.usuario_codigo}. El nuevo coordinador lo verá en su app en la siguiente sincronización y el anterior dejará de verlo.`}
+      onClose={onClose}
+      testId="dialog-reasignar"
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -480,8 +533,7 @@ function ReasignarDialog({
           });
         }}
       >
-        <label>
-          Nuevo coordinador
+        <Field id="rs-oid" label="Nuevo coordinador">
           <select value={oid} onChange={(e) => setOid(e.target.value)} name="coordinador_oid" required>
             {candidates.map((c) => (
               <option key={c.usuario_codigo} value={c.oid ?? ""}>
@@ -489,15 +541,15 @@ function ReasignarDialog({
               </option>
             ))}
           </select>
-        </label>
+        </Field>
         {candidates.length === 0 ? <p className="muted">No hay otros coordinadores activos con cuenta resuelta.</p> : null}
-        {stale ? <p role="alert" className="problem">El registro cambió. Recarga e inténtalo de nuevo.</p> : <ProblemAlert error={error} />}
+        <StaleOrError stale={stale} error={error} />
         <div className="actions">
-          <button type="submit" disabled={mutation.isPending || !oid}>
-            Reasignar
-          </button>
-          <button type="button" className="secondary" onClick={onClose}>
+          <button type="button" className="ghost" onClick={onClose}>
             Cancelar
+          </button>
+          <button type="submit" disabled={mutation.isPending || !oid}>
+            {mutation.isPending ? "Reasignando…" : "Reasignar"}
           </button>
         </div>
       </form>

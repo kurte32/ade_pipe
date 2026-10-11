@@ -1,5 +1,47 @@
-.thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.thumbs figure { margin: 0; width: 120px; }
-.thumb { width: 120px; height: 90px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--color-border); }
-figcaption { font-size: 0.75rem; }
-main h1 { word-break: break-word; }
+/* PWA-specific styles; tokens and components come from @pipeline/ui/base.css */
+.thumbs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.thumbs figure { margin: 0; width: 112px; }
+.thumb { width: 112px; height: 84px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--color-border); display: block; }
+figcaption { font-size: var(--text-xs); color: var(--color-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Site list */
+.site-search { position: relative; margin-bottom: var(--space-2); }
+.site-search .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-muted); pointer-events: none; }
+.site-search input { padding-left: 40px; }
+.site-filters { margin-bottom: var(--space-3); }
+.site-row .badges { display: flex; gap: var(--space-1) var(--space-2); flex-wrap: wrap; align-items: center; margin-top: 4px; }
+.list li.is-attention { border-color: var(--color-brand); box-shadow: inset 4px 0 0 var(--color-brand); }
+
+/* Site detail */
+.site-head .badges { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; margin: var(--space-2) 0; }
+.site-location { display: flex; gap: var(--space-2) var(--space-3); flex-wrap: wrap; align-items: center; font-size: var(--text-sm); color: var(--color-muted); margin: var(--space-2) 0 0; }
+.site-location a { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--color-navy); min-height: 32px; }
+.checklist { list-style: none; padding: 0; margin: 0 0 var(--space-3); }
+.checklist li { display: flex; gap: var(--space-2); align-items: flex-start; padding: 6px 0; font-size: var(--text-sm); }
+.checklist li + li { border-top: 1px solid var(--color-border); }
+.checklist .icon { flex: none; margin-top: 2px; }
+.checklist li.done { color: var(--color-muted); }
+.checklist li.done .icon { color: var(--color-green); }
+.checklist li.missing .icon { color: var(--color-amber); }
+.checklist a { color: inherit; }
+.section-sub { color: var(--color-muted); font-size: var(--text-sm); margin: -4px 0 var(--space-2); }
+.docs { list-style: none; padding: 0; margin: 0; }
+.docs li { display: flex; gap: var(--space-3); align-items: center; padding: var(--space-2) 0; border-top: 1px solid var(--color-border); flex-wrap: wrap; }
+.docs li:first-child { border-top: 0; }
+.docs .doc-body { flex: 1 1 200px; min-width: 0; }
+.docs .doc-name { font-weight: 600; display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.docs .doc-meta { color: var(--color-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.docs .doc-actions { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.file-button { position: relative; display: inline-flex; }
+.file-button input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; min-height: 0; padding: 0; margin: 0; }
+.file-button input[type="file"]:disabled { cursor: not-allowed; }
+.file-button:has(input:focus-visible) .button { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.file-button:has(input:disabled) .button { opacity: 0.5; cursor: not-allowed; }
+.hist { list-style: none; padding: 0; margin: 0; }
+.hist li { display: grid; grid-template-columns: 20px 1fr; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
+.hist li:first-child { border-top: 0; }
+.hist .icon { color: var(--color-muted); margin-top: 2px; }
+.hist .when { color: var(--color-muted); font-size: var(--text-xs); }
+.more-actions summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; font-size: var(--text-sm); color: var(--color-muted); list-style: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.more-actions summary::-webkit-details-marker { display: none; }
+.more-actions[open] summary { color: var(--color-ink); }

@@ -347,6 +347,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@fontsource/montserrat':
+        specifier: 5.2.6
+        version: 5.2.6
       '@pipeline/api-client':
         specifier: workspace:*
         version: link:../api-client
@@ -1114,6 +1117,9 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fontsource/montserrat@5.2.6':
+    resolution: {integrity: sha512-AfFxq1q5tgkOsjQfMFsh95uMXh39VbGOuBLlHLFg16/txv93lqK7Sr6jev0neuJzZy1kqRG16SH6xpUYnk4cZg==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3893,6 +3899,8 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fontsource/montserrat@5.2.6': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

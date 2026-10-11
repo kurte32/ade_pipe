@@ -1,7 +1,7 @@
 import { ApiError } from "@pipeline/api-client";
-import { ProblemAlert, Spinner, formatMexicoCity } from "@pipeline/ui";
+import { Alert, Icon, PageHeader, ProblemAlert, Spinner, formatMexicoCity, usePageTitle } from "@pipeline/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useApi } from "../api";
 import type { EquivalenciaOut } from "../lib/types";
@@ -16,7 +16,12 @@ interface Row {
   isNew?: boolean;
 }
 
+function toRows(data: EquivalenciaOut[]): Row[] {
+  return data.map((e) => ({ ...e, actualizado_utc: e.actualizado_utc }));
+}
+
 export function Equivalencias() {
+  usePageTitle("Equivalencias");
   const api = useApi();
   const qc = useQueryClient();
   const [rows, setRows] = useState<Row[]>([]);
@@ -27,8 +32,15 @@ export function Equivalencias() {
     queryFn: () => api.get<EquivalenciaOut[]>("/api/v1/admin/equivalencias"),
   });
   useEffect(() => {
-    if (q.data) setRows(q.data.map((e) => ({ ...e, actualizado_utc: e.actualizado_utc })));
+    if (q.data) setRows(toRows(q.data));
   }, [q.data]);
+
+  const dirty = useMemo(() => {
+    if (!q.data) return false;
+    const base = toRows(q.data);
+    if (rows.length !== base.length) return true;
+    return rows.some((r, i) => r.isNew || r.correo !== base[i]?.correo || r.activo !== base[i]?.activo);
+  }, [rows, q.data]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -55,14 +67,15 @@ export function Equivalencias() {
     setSaved(false);
     setRows(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   };
+  const removeNew = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
+  const unresolved = rows.filter((r) => !r.isNew && !r.oid).length;
 
   return (
     <main>
-      <h1>Equivalencias usuario → correo</h1>
-      <p className="muted">
-        Cada código USUARIO del archivo de carga se resuelve a una cuenta corporativa. El cambio queda auditado. Si un correo no
-        resuelve a una cuenta, no se guarda ninguna fila.
-      </p>
+      <PageHeader
+        title="Equivalencias de coordinadores"
+        description="Cada código USUARIO del archivo de carga corresponde a una cuenta corporativa. La cuenta se resuelve al guardar; si un correo no existe, no se guarda ninguna fila. Todo cambio queda en la bitácora."
+      />
       {q.isPending ? <Spinner /> : null}
       {q.isError ? <ProblemAlert error={q.error} onRetry={() => void q.refetch()} /> : null}
       {q.data ? (
@@ -72,16 +85,24 @@ export function Equivalencias() {
             save.mutate();
           }}
         >
+          {unresolved ? (
+            <Alert tone="warning" role="none">
+              {unresolved} código{unresolved === 1 ? "" : "s"} sin cuenta resuelta: las cargas con ese USUARIO quedarán en error hasta corregir el correo.
+            </Alert>
+          ) : null}
           <div className="table-wrap">
             <table data-testid="equivalencias-table">
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Correo</th>
-                  <th>Nombre</th>
-                  <th>oid</th>
-                  <th>Activo</th>
-                  <th>Actualizado</th>
+                  <th scope="col">Código</th>
+                  <th scope="col">Correo corporativo</th>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Cuenta</th>
+                  <th scope="col">Activo</th>
+                  <th scope="col">Actualizado</th>
+                  <th scope="col">
+                    <span className="visually-hidden">Acciones</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -94,6 +115,7 @@ export function Equivalencias() {
                           value={r.usuario_codigo}
                           pattern="[a-z]{3,10}"
                           placeholder="abc"
+                          style={{ width: 90 }}
                           onChange={(e) => update(i, { usuario_codigo: e.target.value })}
                         />
                       ) : (
@@ -104,27 +126,45 @@ export function Equivalencias() {
                       <input
                         type="email"
                         aria-label={`Correo ${r.usuario_codigo}`}
+                        aria-invalid={perCodeErrors[r.usuario_codigo] ? true : undefined}
                         value={r.correo}
+                        style={{ minWidth: 220 }}
                         onChange={(e) => update(i, { correo: e.target.value })}
                       />
                       {perCodeErrors[r.usuario_codigo] ? (
-                        <div role="alert" className="pending" data-testid={`eq-error-${r.usuario_codigo}`}>
+                        <div role="alert" className="error" style={{ color: "var(--color-brand-strong)", fontSize: "var(--text-sm)", marginTop: 4 }} data-testid={`eq-error-${r.usuario_codigo}`}>
                           {perCodeErrors[r.usuario_codigo]}
                         </div>
                       ) : null}
                     </td>
                     <td>{r.nombre ?? <span className="muted">—</span>}</td>
-                    <td className="muted">{r.oid ?? "sin resolver"}</td>
+                    <td>
+                      {r.oid ? (
+                        <span className="tag tag-ok" title={r.oid}>
+                          <Icon name="check" size={12} /> resuelta
+                        </span>
+                      ) : r.isNew ? (
+                        <span className="muted small">se resuelve al guardar</span>
+                      ) : (
+                        <span className="tag tag-warning">sin resolver</span>
+                      )}
+                    </td>
                     <td>
                       <input
                         type="checkbox"
                         aria-label={`Activo ${r.usuario_codigo}`}
-                        style={{ width: "auto", minHeight: 0 }}
                         checked={r.activo}
                         onChange={(e) => update(i, { activo: e.target.checked })}
                       />
                     </td>
                     <td className="nowrap">{formatMexicoCity(r.actualizado_utc)}</td>
+                    <td>
+                      {r.isNew ? (
+                        <button type="button" className="ghost small" onClick={() => removeNew(i)} aria-label="Quitar fila nueva">
+                          <Icon name="x" size={16} />
+                        </button>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -132,14 +172,14 @@ export function Equivalencias() {
           </div>
           {save.error && Object.keys(perCodeErrors).length === 0 ? <ProblemAlert error={save.error} /> : null}
           {save.error && Object.keys(perCodeErrors).length > 0 ? (
-            <p role="alert" className="problem" data-testid="eq-problem">
-              Una o más equivalencias no resuelven a una cuenta. Corrige los correos marcados.
-            </p>
+            <Alert tone="error" testId="eq-problem" title="No se guardó ningún cambio">
+              Uno o más correos no corresponden a una cuenta. Corrige los marcados y vuelve a guardar.
+            </Alert>
           ) : null}
           {saved ? (
-            <div className="success" role="status" data-testid="eq-saved">
+            <Alert tone="success" testId="eq-saved">
               Equivalencias guardadas.
-            </div>
+            </Alert>
           ) : null}
           <div className="actions">
             <button
@@ -150,10 +190,12 @@ export function Equivalencias() {
                 setRows([...rows, { usuario_codigo: "", correo: "", activo: true, nombre: null, oid: null, actualizado_utc: null, isNew: true }]);
               }}
             >
-              Agregar fila
+              <Icon name="users" size={16} /> Agregar coordinador
             </button>
-            <button type="submit" disabled={save.isPending} data-testid="eq-guardar">
-              Guardar
+            <span className="spacer" />
+            {dirty && !save.isPending ? <span className="dirty-note">Cambios sin guardar</span> : null}
+            <button type="submit" disabled={save.isPending} data-testid="eq-guardar" title="Guarda los cambios y vuelve a resolver las cuentas">
+              {save.isPending ? "Guardando…" : "Guardar cambios"}
             </button>
           </div>
         </form>

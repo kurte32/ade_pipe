@@ -26,7 +26,7 @@ Sign in with the development user picker (`ard` to `jdc` coordinators, `adm` adm
 | `.github/workflows` | CI, build and deploy, drift detection |
 | `e2e/` | Playwright end-to-end tests |
 | `architecture/` | Target architecture, Azure design, security, ADRs, plan, risks, production readiness |
-| `docs/` | Local development, operations, environments, Azure deployment, implementation status, delivery report, OpenAPI |
+| `docs/` | Local development, operations, environments, Azure deployment, implementation status, delivery report, OpenAPI. `docs/ux/`: UX audit, design system and validation |
 | `samples/` | Synthetic load file generator and files |
 | `*.pdf`, `Propuesta_mejoras_TDD_v0.1.md` | Source design documents (Spanish) and the design review |
 

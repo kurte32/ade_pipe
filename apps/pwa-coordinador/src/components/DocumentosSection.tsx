@@ -1,6 +1,6 @@
 import { ApiError } from "@pipeline/api-client";
-import { formatMexicoCity } from "@pipeline/ui";
-import { useRef, useState } from "react";
+import { Alert, Icon, formatMexicoCity } from "@pipeline/ui";
+import { useState } from "react";
 
 import { useApi } from "../api";
 import { getDb } from "../db/schema";
@@ -34,14 +34,13 @@ export function DocumentosSection({
   const [progress, setProgress] = useState<Record<string, UploadProgress | null>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [info, setInfo] = useState<Record<string, string>>({});
-  const inputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   async function onFile(tipoId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setErrors((x) => ({ ...x, [tipoId]: "Solo se aceptan archivos PDF" }));
+      setErrors((x) => ({ ...x, [tipoId]: "Solo se aceptan archivos PDF." }));
       return;
     }
     setErrors((x) => ({ ...x, [tipoId]: "" }));
@@ -82,58 +81,72 @@ export function DocumentosSection({
     }
   }
 
+  const cargados = tipos.filter((t) => archivos.some((a) => a.tipo === "documento" && a.tipo_documento === t.id && a.vigente && a.estado === "publicado")).length;
+
   return (
     <section aria-labelledby="docs-h">
-      <h2 id="docs-h">Documentos requeridos</h2>
-      {!sync.online ? <p className="pending">Los PDF requieren conexión. Podrás subirlos al recuperar señal.</p> : null}
-      <ul className="list">
+      <div className="card-head">
+        <h2 id="docs-h">Documentos</h2>
+        <span className={`tag ${cargados === tipos.length && tipos.length ? "tag-ok" : "tag-muted"}`}>
+          {cargados} de {tipos.length}
+        </span>
+      </div>
+      <p className="section-sub">PDF, hasta la última versión de cada uno. Se necesitan los {tipos.length} para Recepción de documentos.</p>
+      {!sync.online ? (
+        <Alert tone="neutral" icon="wifi-off">
+          Los PDF se suben con señal. Podrás subirlos al recuperar conexión.
+        </Alert>
+      ) : null}
+      <ul className="docs">
         {tipos.map((t) => {
           const vigente = archivos.find((a) => a.tipo === "documento" && a.tipo_documento === t.id && a.vigente && a.estado === "publicado");
           const p = progress[t.id] ?? null;
           return (
-            <li key={t.id} data-testid={`doc-${t.id}`} style={{ padding: 12 }}>
-              <strong>{t.nombre}</strong>{" "}
-              {vigente ? (
-                <span className="badge badge-recepcion_documentos">cargado · v{vigente.version}</span>
-              ) : (
-                <span className="badge badge-devuelto">falta</span>
-              )}
-              {vigente ? (
-                <div className="muted">
-                  {vigente.nombre_original} · {vigente.paginas ?? "?"} páginas · {formatMexicoCity(vigente.subido_utc)}{" "}
-                  <button type="button" className="secondary" onClick={() => void descargar(vigente)} data-testid={`descargar-${t.id}`}>
-                    Descargar
-                  </button>
-                </div>
-              ) : null}
-              <div className="row" style={{ marginTop: 8 }}>
-                <label htmlFor={`doc-input-${t.id}`} className="button" style={{ display: "inline-block" }}>
-                  {vigente ? "Reemplazar PDF" : "Subir PDF"}
-                </label>
-                <input
-                  id={`doc-input-${t.id}`}
-                  type="file"
-                  accept="application/pdf"
-                  ref={(el) => {
-                    inputs.current[t.id] = el;
-                  }}
-                  onChange={(e) => void onFile(t.id, e)}
-                  disabled={!sync.online || !!p || disabled}
-                  style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}
-                  data-testid={`doc-input-${t.id}`}
-                />
-                {p ? (
-                  <span className="pending" role="status">
-                    {describe(p)}
+            <li key={t.id} data-testid={`doc-${t.id}`}>
+              <Icon name="file-text" className={vigente ? "" : "muted"} />
+              <div className="doc-body">
+                <span className="doc-name">
+                  {t.nombre}
+                  {vigente ? <span className="tag tag-ok">cargado · v{vigente.version}</span> : <span className="tag tag-muted">falta</span>}
+                </span>
+                {vigente ? (
+                  <span className="doc-meta">
+                    {vigente.nombre_original} · {vigente.paginas ?? "?"} páginas · {formatMexicoCity(vigente.subido_utc)}
                   </span>
                 ) : null}
+                {p ? (
+                  <span className="pending" role="status">
+                    <Icon name="upload" size={14} /> {describe(p)}
+                  </span>
+                ) : null}
+                {errors[t.id] ? (
+                  <p role="alert" className="error" style={{ color: "var(--color-brand-strong)", fontSize: "var(--text-sm)", margin: "4px 0 0" }}>
+                    {errors[t.id]}
+                  </p>
+                ) : null}
+                {info[t.id] ? <p className="pending">{info[t.id]}</p> : null}
               </div>
-              {errors[t.id] ? (
-                <p role="alert" className="problem">
-                  {errors[t.id]}
-                </p>
-              ) : null}
-              {info[t.id] ? <p className="pending">{info[t.id]}</p> : null}
+              <div className="doc-actions">
+                {vigente ? (
+                  <button type="button" className="ghost small" onClick={() => void descargar(vigente)} data-testid={`descargar-${t.id}`}>
+                    <Icon name="download" size={16} /> Descargar
+                  </button>
+                ) : null}
+                <span className="file-button">
+                  <span className="button small secondary" aria-hidden="true">
+                    <Icon name="upload" size={16} /> {vigente ? "Reemplazar" : "Subir PDF"}
+                  </span>
+                  <input
+                    id={`doc-input-${t.id}`}
+                    type="file"
+                    accept="application/pdf"
+                    aria-label={`${vigente ? "Reemplazar" : "Subir"} PDF: ${t.nombre}`}
+                    onChange={(e) => void onFile(t.id, e)}
+                    disabled={!sync.online || !!p || disabled}
+                    data-testid={`doc-input-${t.id}`}
+                  />
+                </span>
+              </div>
             </li>
           );
         })}

@@ -49,6 +49,7 @@ Ownership while working in parallel: a module owner edits only its directory. Sh
 - `packages/api-client` exports a typed client generated from `docs/openapi.json` (`openapi-typescript`) and `createApi(auth)` adding `Authorization`, `Idempotency-Key`, `If-Match`, and `X-Correlation-Id`. Problem Details are parsed into `ApiError`.
 - All API paths are relative (`/api/v1/...`). Vite dev server proxies `/api` and `/dev-idp`. No absolute backend URLs in code.
 - UI text in Spanish (the users' language). Code, identifiers, and comments in English.
+- Visual language: tokens and shared components live in `packages/ui` and follow `docs/ux/DESIGN_SYSTEM.md`. No inline colours or sizes; codes from the API are shown through the label maps or the catalogs.
 - Tests: `vitest` for units, Playwright in `e2e/` for workflows. Playwright tests sign in through the dev IdP user picker.
 - Style: `eslint` (typescript-eslint recommended), `prettier`. Scripts per package: `dev`, `build`, `lint`, `typecheck`, `test`.
 

@@ -22,9 +22,9 @@ test.describe("HU-13: admin returns a site; RF-09 reassignment", () => {
 
     await expect(page.getByRole("status")).toContainText("Sitio devuelto a Sitio Prospectado");
     await expect(page.locator(".badge-devuelto")).toContainText("devuelto");
-    await expect(page.getByTestId("detail-devolucion")).toContainText("calidad_datos");
+    await expect(page.getByTestId("detail-devolucion")).toContainText("Calidad de datos insuficiente");
     const historial = page.getByTestId("historial");
-    await expect(historial).toContainText("devolucion");
+    await expect(historial).toContainText("Devolución");
     await expect(historial).toContainText("Teléfono del dueño incompleto");
 
     await page.getByRole("button", { name: "Reasignar", exact: true }).click();
@@ -37,7 +37,7 @@ test.describe("HU-13: admin returns a site; RF-09 reassignment", () => {
     await reasignar.getByRole("button", { name: "Reasignar" }).click();
     await expect(page.getByRole("status")).toContainText("Sitio reasignado");
     await expect(page.getByTestId("detail-coordinador")).toContainText("mmi");
-    await expect(historial).toContainText("reasignacion");
+    await expect(historial).toContainText("Reasignación");
 
     // The site now shows up under mmi in the list.
     const nombre = ((await page.locator("h1").first().innerText()).split("#")[0] ?? "").trim();
