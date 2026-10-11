@@ -132,8 +132,8 @@ Step counts for the two most frequent tasks (counted on the running app):
 | Attention queues cap | S3 | Landing-page queues come from the first 200 sites; a server-side filter (`devuelto`, `en_revision_admin`) would be needed above that volume. |
 | Stale local cache (P12) | S3 | Sign-out clears local data (now behind a confirmation when captures are unsent); a "volver a descargar mis sitios" action in the sync chip menu would make recovery discoverable. |
 | Screen-reader pass | S2 | Not performed. |
-| Admin tables on phones | S3 | They scroll horizontally and remain readable; a card layout for the sites table on phones would be nicer but is secondary for a desktop-first admin. |
-| Audit action labels | S3 | Actions stay as codes by design; a glossary tooltip could help new admins. |
+| Admin tables on phones | resolved 11 Oct | The sites table renders as labelled cards under 600 px (`screenshots/admin-sitios-phone-cards.png`, no horizontal overflow); the other admin tables still scroll horizontally. |
+| Audit action labels | resolved 11 Oct | Codes stay, with a plain-language tooltip on each row and in the filter list. |
 | App icon lettering | S3 | `icon.svg` draws the roundel letters as SVG text in Montserrat; where the font is not installed (favicon, home-screen icon) the fallback is Arial. Resolved together with the official vector logo. |
-| Admin "Últimas cargas" rows on phones | S3 | File name, state tag and chevron wrap on 390 px; readable but not tidy. |
+| Admin "Últimas cargas" rows on phones | resolved 11 Oct | The state tag moves under the title at phone width. |
 | Chrome extension flakiness | tooling | Documented above; Playwright remains the CI path. |
