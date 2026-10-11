@@ -128,6 +128,9 @@ def test_reasignar_moves_pending_notifications(  # type: ignore[no-untyped-def]
     for destinatario, estado in rows:
         if estado == "pendiente":
             assert str(destinatario).lower() == str(two_sites["oid_b"]).lower()
+    # and whatever was already sent to the previous coordinator leaves their feed with the site
+    feed = client.get("/api/v1/notificaciones", headers=coord_a_headers).json()
+    assert all(n["sitio_id"] != sid for n in feed["items"])
 
 
 def test_overlapping_outbox_runs_send_each_row_once(  # type: ignore[no-untyped-def]

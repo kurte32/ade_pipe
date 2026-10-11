@@ -136,6 +136,42 @@
               "default": false,
               "title": "Incluir No Vigentes"
             }
+          },
+          {
+            "name": "en_revision_admin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "solo sitios que esperan una decisión del administrador",
+              "title": "En Revision Admin"
+            },
+            "description": "solo sitios que esperan una decisión del administrador"
+          },
+          {
+            "name": "devuelto",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "solo sitios devueltos",
+              "title": "Devuelto"
+            },
+            "description": "solo sitios devueltos"
           }
         ],
         "responses": {
@@ -284,6 +320,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -331,6 +369,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -388,6 +428,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -445,6 +487,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -502,6 +546,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -579,6 +625,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -636,6 +684,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -693,6 +743,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Sitio Id"
             }
           }
@@ -1370,12 +1422,12 @@
       }
     },
     "/api/v1/archivos/{archivo_id}": {
-      "head": {
+      "get": {
         "tags": [
           "archivos"
         ],
         "summary": "Descargar Archivo",
-        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__head",
+        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -1408,12 +1460,12 @@
           }
         }
       },
-      "get": {
+      "head": {
         "tags": [
           "archivos"
         ],
         "summary": "Descargar Archivo",
-        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__head",
+        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__get",
         "security": [
           {
             "HTTPBearer": []

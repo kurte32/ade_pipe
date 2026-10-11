@@ -546,7 +546,7 @@ implemented statically and will be verified by the first real `build-deploy` run
 
 | Finding | Status | Where |
 |---|---|---|
-| DAT-1, DAT-4, DAT-5, DAT-6 | fixed (`sitios.cambiar_propietario`, 422s) | `2444a68` |
+| DAT-1, DAT-4, DAT-5, DAT-6 | fixed (`sitios.cambiar_propietario`, 422s; pending notices follow the site and sent ones leave the previous coordinator's feed) | `2444a68`, feed filter in the final commit |
 | FE-1, FE-3, CI-1/DAT-8, LINT-1, DOC-1 | fixed | `2444a68` |
 | IDN-2, CI-4 (guard side) | fixed (`deployed` semantics, image default) | `1f47e7d` |
 | DAT-2, DAT-3, DAT-11/FE-5 | fixed (site lock and touch, filtered unique index, migration `b7c2e4a1d9f0`) | `1f47e7d`, hints corrected in `a2d8cc8` |
@@ -557,6 +557,7 @@ implemented statically and will be verified by the first real `build-deploy` run
 | FE-6, FE-7, FE-8, FE-9, FE-11, FE-12, FE-13, FE-14, FE-15 | fixed | `47681d9` |
 | INF-1, INF-2, INF-3, INF-4, INF-5, CI-2, CI-3, CI-4 (smoke test), CI-5, CI-6, TST-3, TST-4 | implemented statically / fixed | `caa1612` |
 | Found during remediation: the new `avanzar` lock ran after the If-Match check, so a waiting request passed with the new version | fixed, caught by the TST-4 burst test | `caa1612` |
+| Found in review: the deployment guard required `TEAMS_APP_ID` while Bicep hardcoded `NOTIFY_MODE=graph`, so dev would have refused to start | fixed: `notifyMode` parameter, `log` in dev and test until the Teams app exists | final commit |
 | FE-10 | open by decision (captures stay unconditional unless the client sends If-Match) | backlog `FE-10` |
 | DAT-13 (mark-read, `escaneando`, send outcome), DAT-14 (`datetime2`), DAT-15, DAT-16, DAT-17, IDN-6, IDN-8, TST-4 (SPID), coverage tooling, CI service image pins | open, P3 | backlog §3 |
 | Azure verification of INF-1..4, CI-2..4; MSAL against a tenant; pen test; device test; screen-reader pass | needs the test environment | backlog §1–§2 |

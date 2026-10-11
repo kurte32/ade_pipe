@@ -55,6 +55,9 @@ param documentsBlobEndpoint string
 param stagingContainer string = 'staging'
 param documentsContainer string = 'documents'
 param teamsAppId string = ''
+@description('Notification sender: graph needs the Teams app id (TEAMS_APP_ID); log keeps the in-app feed only. The guard refuses graph without an app id in any deployed environment.')
+@allowed(['graph', 'log'])
+param notifyMode string = 'graph'
 param graphBaseUrl string = 'https://graph.microsoft.com/v1.0'
 param retentionYears int = 5
 
@@ -90,7 +93,7 @@ var commonEnv = [
   { name: 'STORAGE_DOCUMENTS_CONTAINER', value: documentsContainer }
   { name: 'SCAN_MODE', value: enableDefenderScanning ? 'defender' : 'none' }
   { name: 'TRUSTED_PROXY_HOPS', value: string(trustedProxyHops) }
-  { name: 'NOTIFY_MODE', value: 'graph' }
+  { name: 'NOTIFY_MODE', value: notifyMode }
   { name: 'DIRECTORY_MODE', value: 'graph' }
   { name: 'GRAPH_BASE_URL', value: graphBaseUrl }
   { name: 'TEAMS_APP_ID', value: teamsAppId }

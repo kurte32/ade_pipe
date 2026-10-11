@@ -15,6 +15,8 @@ param sqlAdminGroupObjectId = '00000000-0000-0000-0000-000000000010'
 param sqlAdminGroupName = 'PIPELINE-SQL-Admins-test'
 param fabricWorkspaceIdentityPrincipalId = ''
 param teamsAppId = ''
+// No Teams app yet (backlog TEAMS): the in-app feed only. Switch to graph once teamsAppId is set.
+param notifyMode = 'log'
 
 param apiImage = 'mcr.microsoft.com/k8se/quickstart:latest' // replaced by the CI digest on deploy
 param workloadProfileType = 'D4'

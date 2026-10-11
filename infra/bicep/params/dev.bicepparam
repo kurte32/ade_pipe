@@ -44,3 +44,5 @@ param lockImmutabilityPolicy = false
 param environmentName = 'test'
 param logLevel = 'DEBUG'
 param appPublicUrl = 'https://swa-pipeline-pwa-dev.azurestaticapps.net'
+// No Teams app yet (backlog TEAMS): the in-app feed only. Switch to graph once teamsAppId is set.
+param notifyMode = 'log'

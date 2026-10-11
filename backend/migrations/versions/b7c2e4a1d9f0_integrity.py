@@ -24,13 +24,13 @@ def upgrade() -> None:
         UPDATE a SET vigente = 0
         FROM sitio_archivo a
         JOIN (
-            SELECT sitio_id, tipo_documento, MAX(subido_utc) AS ultimo
+            SELECT id, ROW_NUMBER() OVER (
+                PARTITION BY sitio_id, tipo_documento ORDER BY subido_utc DESC, id DESC
+            ) AS rn
             FROM sitio_archivo
             WHERE vigente = 1 AND tipo = 'documento'
-            GROUP BY sitio_id, tipo_documento
-            HAVING COUNT(*) > 1
-        ) d ON d.sitio_id = a.sitio_id AND d.tipo_documento = a.tipo_documento
-        WHERE a.vigente = 1 AND a.tipo = 'documento' AND a.subido_utc < d.ultimo
+        ) d ON d.id = a.id
+        WHERE d.rn > 1
         """
     )
     op.execute(

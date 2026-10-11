@@ -55,7 +55,7 @@ variable fails closed. Deployed non-production never trusts an unvalidated certi
 | `STORAGE_STAGING_ACCOUNT_URL`, `STORAGE_DOCUMENTS_ACCOUNT_URL` | empty | empty | module outputs (blob endpoints) |
 | `STORAGE_STAGING_CONTAINER`, `STORAGE_DOCUMENTS_CONTAINER` | `staging`, `documents` | same | same |
 | `SCAN_MODE` | `none` | `none` | `defender` |
-| `NOTIFY_MODE` | `log` | `log` | `graph` |
+| `NOTIFY_MODE` | `log` | `log` | param `notifyMode`: `log` in dev and test until the Teams app exists (backlog TEAMS), `graph` in prod (required by the guard) |
 | `DIRECTORY_MODE` | `dev` | `dev` | `graph` |
 | `GRAPH_BASE_URL` | Graph v1.0 | same | param `graphBaseUrl` |
 | `TEAMS_APP_ID` | empty | empty | param `teamsAppId` |

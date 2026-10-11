@@ -70,10 +70,17 @@ def _to_out(n: NotificacionOutbox) -> NotificacionOut:
 
 
 def list_mine(session: Session, claims: Claims, limit: int = 100) -> NotificacionList:
+    # Only notices about sites the caller can still see: after a reassignment the admin's return
+    # comment must not stay in the previous coordinator's feed with a dead link (audit DAT-5).
+    # RLS on `sitio` filters the subquery to the caller's own sites.
+    visible = select(Sitio.id)
     rows = list(
         session.execute(
             select(NotificacionOutbox)
-            .where(NotificacionOutbox.destinatario_oid == claims.oid)
+            .where(
+                NotificacionOutbox.destinatario_oid == claims.oid,
+                NotificacionOutbox.sitio_id.in_(visible),
+            )
             .order_by(NotificacionOutbox.id.desc())
             .limit(limit)
         ).scalars()
@@ -81,6 +88,7 @@ def list_mine(session: Session, claims: Claims, limit: int = 100) -> Notificacio
     unread = session.execute(
         select(func.count()).where(
             NotificacionOutbox.destinatario_oid == claims.oid,
+            NotificacionOutbox.sitio_id.in_(visible),
             NotificacionOutbox.leida_utc.is_(None),
         )
     ).scalar()

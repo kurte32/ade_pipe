@@ -31,6 +31,9 @@ param sqlAdminGroupObjectId string
 param sqlAdminGroupName string
 param fabricWorkspaceIdentityPrincipalId string = ''
 param teamsAppId string = ''
+@description('graph (Teams activity feed, needs teamsAppId) or log (in-app feed only). Production requires graph.')
+@allowed(['graph', 'log'])
+param notifyMode string = 'graph'
 
 // Compute and data sizing
 param apiImage string
@@ -223,6 +226,7 @@ module containerapps 'modules/containerapps.bicep' = {
     stagingBlobEndpoint: storage.outputs.stagingBlobEndpoint
     documentsBlobEndpoint: storage.outputs.documentsBlobEndpoint
     teamsAppId: teamsAppId
+    notifyMode: notifyMode
   }
 }
 

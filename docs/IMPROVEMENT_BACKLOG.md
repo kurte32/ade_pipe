@@ -40,7 +40,7 @@ depends on third parties).
 |---|---|---|---|---|---|
 | DEVICE | Offline chain on a real Intune Android phone: 24 h offline token renewal, `loginRedirect` from the installed PWA, selective-wipe behaviour | Engineering + Intune | P0 | M | DELIVERY_REPORT §10 item 1 |
 | MSAL | MSAL sign-in and token negative cases against the real tenant | Engineering + Identidad | P0 | S | PRODUCTION_READINESS_PLAN 3.2 |
-| TEAMS | Publish the Teams app or adopt the Power Automate fallback (ADR-007); verify activity-feed delivery; payload carries no contact data | TI + Seguridad | P0 | L | TO_BE Q4 |
+| TEAMS | Publish the Teams app or adopt the Power Automate fallback (ADR-007); verify activity-feed delivery; payload carries no contact data ; then set `notifyMode = 'graph'` and `teamsAppId` in the dev/test parameter files (they run with `log` until then) | TI + Seguridad | P0 | L | TO_BE Q4 |
 | FABRIC | Workspace identity, trusted workspace access, OneLake shortcut, Mirroring through the VNet gateway excluding `sitio_contacto`, `auditoria`, `operacion_idempotente`, `carga_fila_staging` | Fabric admin + Datos | P1 | L | AZURE_DEPLOYMENT §2.5 |
 | FD | Front Door, WAF and Private Link origin approval; rate-limit rule verified under a burst | TI | P0 | M | AZURE_DEPLOYMENT §8 |
 | AZ-6 | Restrict the direct Static Web App hostnames to Front Door | Engineering | P1 | S | AZURE_DEPLOYMENT §6 |

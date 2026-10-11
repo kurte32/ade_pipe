@@ -36,7 +36,9 @@ registrations.
      `Coordinador` and `Admin`, `requestedAccessTokenVersion = 2`, Assignment Required = Yes.
    - `pipeline-pwa-coordinador-{env}` and `pipeline-web-admin-{env}`: SPA platform, redirect URIs from
      section 7, delegated permission `access_as_user` with admin consent. Assignment Required = Yes on
-     the admin SPA with only `PIPELINE-Admins` assigned.
+     the admin SPA with only `PIPELINE-Admins` assigned. The admin SPA's client id goes into
+     `authAdminAzp` (and into `authAllowedAzp`): the API honours the Admin role only from that
+     client, so this registration's policies cannot be bypassed through the coordinator app.
    - Groups `PIPELINE-Coordinadores` and `PIPELINE-Admins` assigned to the roles (needs Entra ID P1;
      fallback is direct user assignment).
    - Group `PIPELINE-SQL-Admins-{env}`: SQL server administrator. Add the managed identity
@@ -169,22 +171,33 @@ the previous digest, never an automatic downgrade.
 
 ## 6. Static Web Apps
 
-Both apps are deployed as prebuilt bundles (`skip_app_build: true`). The admin app is routed at
-`/admin/*` through Front Door in this template, which the pipeline does not yet honour: the bundle
-is built with base `/`, Front Door forwards the `/admin/` prefix to the SWA unchanged, and MSAL
-redirects to the origin. See `IMPROVEMENT_BACKLOG.md` ADMIN-BASE for the options (the
-recommendation is a separate admin hostname, which removes the prefix altogether).
-Direct SWA hostnames remain reachable; in production restrict them to Front Door with SWA
+Both apps are deployed as prebuilt bundles (`skip_app_build: true`) with base `/`. Front Door has
+two endpoints (host-based routing, audit INF-1): the PWA host serves `/api/*` to the Container App
+and `/*` to the PWA Static Web App; the admin host (output `frontDoorAdminHostname`) serves
+`/api/*` to the Container App and `/*` to the admin Static Web App. One bundle per app is promoted
+unchanged through the environments and MSAL's redirect URI is simply the origin.
+
+Without Front Door (dev, `deployFrontDoor=false`) the SPAs are served from their SWA hosts and call
+the Container App directly: the deploy writes `VITE_API_BASE_URL` (the API FQDN) into each
+`config.json`, `main.bicep` passes the two SWA origins to the API as `CORS_ALLOWED_ORIGINS`, and
+the SWA Content-Security-Policy allows `connect-src https://*.azurecontainerapps.io`. The SQL
+server gets the "allow Azure services" firewall rule and the Container Apps subnet may reach the
+`Sql` service tag (ports 1433 and 11000–11999). None of this has run in Azure yet; the first
+`deploy-dev` is the test.
+
+Direct SWA hostnames remain reachable in test and prod; restrict them to Front Door with SWA
 `networking.allowedIpRanges` set to the Front Door backend ranges or use SWA private endpoints
-(Standard SKU). This restriction is not in the template yet.
+(Standard SKU). This restriction is not in the template yet (backlog AZ-6).
 
 ## 7. Front Door host and redirect URIs
 
 | Environment | Public host | Redirect URIs to register |
 |---|---|---|
-| dev | `https://swa-pipeline-pwa-dev.azurestaticapps.net` (no Front Door) | that host, `https://swa-pipeline-admin-dev.azurestaticapps.net`, `http://localhost:5173`, `http://localhost:5174` |
-| test | `https://pipeline-test-<hash>.z01.azurefd.net` (output `frontDoorHostname`) | `https://<host>/`, `https://<host>/admin/` |
-| prod | custom domain on Front Door (to be defined by TI) | `https://<domain>/`, `https://<domain>/admin/` |
+| dev | `https://swa-pipeline-pwa-dev.azurestaticapps.net` and `https://swa-pipeline-admin-dev.azurestaticapps.net` (no Front Door) | PWA registration: the PWA host and `http://localhost:5173`; admin registration: the admin host and `http://localhost:5174` |
+| test | `https://pipeline-test-<hash>.z01.azurefd.net` (output `frontDoorHostname`) and `https://pipeline-test-admin-<hash>.z01.azurefd.net` (output `frontDoorAdminHostname`) | PWA registration: `https://<pwa-host>/`; admin registration: `https://<admin-host>/` |
+| prod | custom domains on both Front Door endpoints (to be defined by TI) | PWA registration: `https://<pwa-domain>/`; admin registration: `https://<admin-domain>/` |
+
+Each SPA registration lists only its own origin; there is no `/admin/` path any more.
 
 Update `appPublicUrl` in the parameter file once the host is known; it is used in Teams notification links.
 
