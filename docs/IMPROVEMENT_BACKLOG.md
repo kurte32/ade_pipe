@@ -26,14 +26,13 @@ depends on third parties).
 | GRAPH | Admin consent for `User.ReadBasic.All` and `TeamsActivity.Send` on `id-pipeline-api-{env}` | Identidad | P0 | S | DELIVERY_REPORT §8 |
 | OIDC | GitHub OIDC federation per environment, role assignments, `AcrPull` on the dev registry, environment secrets and variables, required reviewers | TI + engineering | P0 | M | AZURE_DEPLOYMENT §2.3 |
 | BRANCH | Branch protection on `main` requiring the `ci` checks | Repo admin | P0 | S | AZURE_DEPLOYMENT §2.3 |
-| DEPLOY-RUN | Run `build-deploy` for real: 0 % revision, migrate job, health, traffic shift, auto-rollback, `az acr import` (all statically validated only) | Engineering | P0 | M | AZURE_DEPLOYMENT §11 |
+| DEPLOY-RUN | Run `build-deploy` for real: 0 % revision, migrate job, health, traffic shift, auto-rollback, `az acr import` (all statically validated only). First run also verifies the audit remediation that could not be exercised locally: admin SPA on its own Front Door host (INF-1), dev SPA→API through CORS and `VITE_API_BASE_URL` plus the SQL firewall and NSG rules (INF-2), control-plane promotion into a private registry (INF-3), diagnostic settings (INF-4), drift zero-change (CI-2), smoke test tenant and admin checks (CI-4) | Engineering | P0 | M | AZURE_DEPLOYMENT §11; audit ENGINEERING_AUDIT_2026-10-11 §K |
 | DEFENDER | Defender for Storage plan approved and enabled; EICAR check | Seguridad + TI | P0 | M | DELIVERY_REPORT §8 |
 | IMMUT | Container-level immutability and legal hold on the documents account; confirm the ADR-003 addendum with Seguridad (locking is manual and irreversible) | Seguridad + Legal | P0 | M | AZURE_DEPLOYMENT §11 |
 | MI-KV | Entra-only SQL with managed-identity token and Key Vault references resolved for the API and the migrate job | Engineering + TI | P0 | M | PRODUCTION_READINESS_PLAN 3.3 |
 | Pend 4/5/8 | Business catalogs: required documents, minimum fields per status, return reasons, terminal statuses. Provisional values are seeded | Negocio | P0 | S (after decision) | TO_BE Q5 |
 | Pend 7 | Retention start event, legal hold, treatment of discarded sites | Legal | P0 | S (after decision) | TO_BE Q1 |
 | Pend 13 | Privacy notice shown before capturing owner contact data | Legal | P0 | S (after text) | PRODUCTION_READINESS §8 |
-| ADMIN-BASE | The admin web cannot work behind the current Front Door routing. `build-deploy.yml` builds it once with base `/`; Front Door forwards `/admin/*` to the admin SWA with the prefix intact, so `/admin/assets/x.js` misses `assets/x.js` and the SWA fallback serves `index.html` as the script; and MSAL redirects to the origin, which Front Door routes to the PWA. Three coupled changes (bundle base, Front Door rewrite or routing, redirect URI) across the pipeline, Bicep, SWA config and `packages/auth`, none of which can be exercised locally. Options: **(A)** two admin builds (dev `/`, test and prod `/admin/`), a Front Door rule set that strips the prefix, a redirect URI of `origin + base`; **(B)** host-based routing, `admin.<host>` to `og-admin`, base stays `/` everywhere, one bundle promotes unchanged, redirect URI unchanged (needs the prod domain, pending with TI); **(C)** Front Door in dev as well so one layout is tested early. Recommendation: B, with C once the prod domain exists | Engineering + TI | P0 | M | `.github/workflows/build-deploy.yml`, `infra/bicep/modules/frontdoor.bicep` routes, `apps/web-admin/vite.config.ts`, `packages/auth/src/msal.ts`, `AZURE_DEPLOYMENT.md` §6 and §7 |
 
 ## 2. Required before go-live (test environment exists)
 
@@ -64,14 +63,12 @@ depends on third parties).
 
 | Id | Item | Prio | Effort | Source |
 |---|---|---|---|---|
-| A3 | Validate the Front Door id header in the API so origin restriction is not network-only | P1 | S | TECHNICAL_FINDINGS Info |
 | B-04r | Bulk load: reject a 100k-row XLSX in under 2 s (today 4.8 s) | P2 | M | REMEDIATION_PLAN second pass |
 | D-03r | `/readyz` cannot read `alembic_version` with the app role; expose the applied revision another way (startup log or a grant on a view) | P2 | S | PRODUCTION_READINESS_PLAN progress |
 | LEDGER-DIGEST | Configure external ledger digest storage so `sp_verify_database_ledger` checks against an immutable copy | P2 | S | OPERATIONS RB-08 |
 | PURGE-ERR | Purge job treats any delete failure as "protected, skip"; distinguish a legal hold from a misconfiguration | P2 | S | DELIVERY_REPORT §9 |
 | SHA-STREAM | Streaming SHA-256 for large PDFs on the phone (today the file is hashed in memory) | P3 | M | DELIVERY_REPORT §10 item 7 |
 | XLS-REAL | Verify `.xls` parsing with a real legacy file from the business | P2 | S | DELIVERY_REPORT §9 |
-| UX-QUEUES | Server-side filters `devuelto` and `en_revision_admin` on `GET /api/v1/sitios` so the admin landing page is not capped at 200 sites | P2 | S | ux/UX_VALIDATION §4 |
 | UX-P12 | "Volver a descargar mis sitios" action for a diverged local cache (today: sign out) | P2 | S | ux/UX_VALIDATION §4 |
 | UX-SR | Screen-reader pass (TalkBack, NVDA) and an axe scan in e2e | P1 | M | ux/UX_VALIDATION §3 |
 | UX-TABLES | Card layout for the admin sites table on phones | P3 | M | ux/UX_VALIDATION §4 |
@@ -82,16 +79,24 @@ depends on third parties).
 | LOG-FIELDS | Add `duration_ms`, `revision`, `job_name`, `sitio_id`/`lote_id` where available, as designed in PRODUCTION_READINESS §2.1 | P2 | S | PRODUCTION_READINESS §2.1 |
 | SCHED | Local scheduler uses fixed intervals, Azure uses cron; document only (accepted) | P3 | — | DELIVERY_REPORT §9 |
 
-Observed in code during the documentation pass of 11 October 2026 (read, not reproduced):
+Observed in code during the documentation pass of 11 October 2026 (read, not reproduced), plus
+what the engineering audit of the same day left open (`docs/audit/ENGINEERING_AUDIT_2026-10-11.md`
+§L has the full remediation status):
 
 | Id | Item | Prio | Effort | Where |
 |---|---|---|---|---|
-| DEV-ENV-NAME | `params/dev.bicepparam` sets `environmentName: 'test'` for the dev environment; presumably to keep the production guard off, but undocumented | P2 | S | `infra/bicep/params/dev.bicepparam` |
-| REASIGNAR-OUTBOX | `reasignar` rewrites `coordinador_oid` on contact, visit, files and upload sessions but not `notificacion_outbox.destinatario_oid`; pending notices stay addressed to the previous coordinator | P2 | S | `backend/app/modules/transiciones/service.py` reasignar |
-| PHOTO-REPLAY | A photo retry replays `POST /subidas` through the idempotency store; the stored `partes_recibidas` can be stale, so parts may be sent again (harmless but wasteful) | P3 | S | `apps/pwa-coordinador/src/sync/engine.ts` foto path |
-| ENTREGADO | Status `entregado` is seeded as terminal but no code path assigns it; either add the admin action or drop it from the catalog once Negocio decides (pendiente Q5) | P2 | S | `backend/app/models.py`, `transiciones/service.py` |
+| ENTREGADO | Status `entregado` is seeded as terminal but no code path assigns it; either add the admin action or drop it from the catalog once Negocio decides (pendiente Q5). Audit DAT-15 | P2 | S | `backend/app/models.py`, `transiciones/service.py` |
+| FE-10 | A contact or visit queued before a transition is sent unconditionally and its new ETag is recorded as "ours", so an admin change made in between is not surfaced as a 412 on the transition. Deliberate trade-off (offline devices rarely hold a fresh ETag; the backend now honours `If-Match` on captures when sent); decide whether captures should carry `etagBase` once the pilot shows how often admins change sites mid-capture | P3 | S | `apps/pwa-coordinador/src/sync/engine.ts` |
+| DAT-16 | Multi-range and unknown-unit `Range` headers answer 416 where RFC 9110 prefers 200 with the full body | P3 | S | `backend/app/modules/archivos/validation.py` |
+| DAT-17 | `neutralize()` prefixes `'` to cells starting with `= + - @` at load time (into staging originals); the TDD asks for neutralisation on export, and there is no export. Harmless today; revisit when an export exists | P3 | S | `backend/app/modules/cargas/validation.py` |
+| DAT-14b | Business tables use `datetime` (3.33 ms) while ledgers use `datetime2(3)`; a `datetime2` migration is a broad ALTER and was deferred | P3 | M | migration |
+| DAT-13b | Still unaudited writes: marking a notification read, the `escaneando` transition, outbox send outcomes | P3 | S | `notificaciones/service.py`, `archivos/service.py`, `jobs/outbox.py` |
+| IDN-6 | The app login can set `rol='Admin'` in session context itself; add a lint rule (ruff S608 or a grep) banning f-string `text()` in `app/modules` so static SQL stays the invariant | P3 | S | CI |
+| IDN-8 | No application-level or per-user rate limiting (Front Door WAF only, absent in dev); add a per-oid limiter on upload and bulk-load routes if the pilot shows abuse | P3 | M | `backend/app/core` |
+| COV | `pytest-cov` is not installed; no backend coverage figure. Vitest coverage not configured | P3 | S | `backend/pyproject.toml`, CI |
+| CI-IMAGES | CI service images (`mssql/server:2022-latest`, `azurite:latest`) are unpinned; pin once the tags are checked | P3 | S | `.github/workflows/ci.yml` |
+| TST-4b | The pooled-connection RLS test does not assert the same SPID is reused | P3 | S | `backend/tests/integration/test_identity_and_rls.py` |
 | E2E-ENTRA | No automated acceptance run against an Entra-protected environment (Playwright signs in through the dev picker only) | P1 | M | `e2e/helpers/auth.ts` |
-| PROMOTE-GATE | `deploy-test` and `deploy-prod` both depend only on `build`; prod is held by reviewers, not by a green test | P2 | S | `.github/workflows/build-deploy.yml` |
 
 ## 4. Product ideas (not in the TDD; need a business owner before any work)
 

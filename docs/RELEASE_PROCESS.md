@@ -62,6 +62,20 @@ Configuration needed in GitHub per environment: secrets `AZURE_CLIENT_ID`, `AZUR
 `VITE_SPA_CLIENT_ID_PWA`, `VITE_SPA_CLIENT_ID_ADMIN`, `VITE_API_CLIENT_ID`, `PUBLIC_HOST`, and
 dev-only `DEV_ALLOWED_INGRESS_CIDRS`.
 
+Pipeline rules added by the audit remediation (11 October 2026):
+
+- A `release-x.y.z` tag reuses the image digest that `main` built for the same commit (it must
+  exist in the dev registry); a tag on an unbuilt commit builds and scans first.
+- `deploy-prod` runs only after `deploy-test` of the same tag succeeded; a manual
+  `workflow_dispatch` with `target=prod` (rollback to a known digest) skips test and is held by the
+  prod environment's reviewers. The dispatch input is validated (`sha256:<hex>`).
+- The smoke test refuses a placeholder `VITE_TENANT_ID`, fetches the tenant's OIDC metadata, expects a
+  401 Problem Details from `/api/v1/me`, and loads the admin page plus every script it references
+  on the admin Front Door host.
+- Every deploy step runs with `pipefail`; the drift job resolves the serving revision and the dev
+  CIDR variable exactly like the deploy, so a clean deployment yields zero changes.
+- Base images are pinned by digest in `backend/Dockerfile`; bump them deliberately.
+
 ## 4. Release checklist
 
 1. Merge the release PR into `main`; wait for `ci` and (when Azure exists) `deploy-dev`.
@@ -100,13 +114,8 @@ A rollback is a release: write it in `CHANGELOG.md` and open a backlog item for 
 
 ## 7. Known gaps in the pipeline (tracked in `docs/IMPROVEMENT_BACKLOG.md`)
 
-- ADMIN-BASE: the admin SPA is built once with base `/` (`VITE_BASE_PATH` unset in
-  `build-deploy.yml`) while Front Door routes `/admin/*` to it in test and prod. A base-path build
-  alone is not enough (Front Door forwards `/admin/assets/...` unchanged and the SWA has
-  `assets/...` at its root), and the MSAL redirect URI is the origin, not `/admin/`. The options
-  and the recommendation (host-based routing) are in `IMPROVEMENT_BACKLOG.md` §1; decide before the
-  first test deployment.
-- DEV-ENV-NAME: `params/dev.bicepparam` sets `environmentName: 'test'` for dev (so the production
-  guard does not refuse Azurite-free substitutes); document the intent in the file.
 - E2E-ENTRA: no automated acceptance against an Entra-protected environment.
-- PROMOTE-GATE: no enforced test-before-prod gate beyond reviewers.
+- AZURE-FIRST-RUN: every pipeline and template change made for the audit (admin host-based
+  routing, dev CORS and API base, control-plane digest promotion, diagnostics, drift parameters,
+  tenant check in the smoke test, prod after test) is statically validated only; the first real
+  run of `build-deploy` is the gate (backlog DEPLOY-RUN).

@@ -3,8 +3,13 @@
 Date: 11 October 2026 · Branch `ux-redesign` · **Audience:** engineers and L2 support · **When to read:** before a schema change or a support query · **Source of truth:** `backend/app/models.py` and the baseline migration.
 
 Reference for support queries and schema changes. Source of truth: `backend/app/models.py` and
-the baseline migration `backend/migrations/versions/1130828e690d_baseline.py`. Ledger tables and
-row-level security are raw SQL in that migration; autogenerate never manages them.
+the migrations under `backend/migrations/versions/`: `1130828e690d_baseline` (tables, RLS,
+ledgers, grants), `b7c2e4a1d9f0_integrity` (one `vigente` copy per document type: filtered unique
+index `ux_sitio_archivo_documento_vigente`) and `c9d1e2f3a4b5_checks` (CHECK constraints on every
+state and value column the code assumed, plus the FK `subida_sesion.tipo_documento`). Ledger
+tables, row-level security and CHECK constraints are raw SQL; autogenerate never manages them, and
+`sitio.rowversion` is excluded from autogenerate on purpose (it is a system column that autogenerate
+would otherwise try to drop). CI runs `alembic check` after every upgrade.
 
 ## 1. Tables
 
@@ -47,6 +52,16 @@ row-level security are raw SQL in that migration; autogenerate never manages the
 |---|---|
 | `sitio_estatus_historial` | `sitio_id`, `estatus_anterior`, `estatus_nuevo`, `tipo` (`avance`, `devolucion`, `descarte`, `reasignacion`, `carga`), `motivo`, `comentario`, `usuario_oid`, `fecha_utc`, `origen` (`pwa`, `admin`, `carga`) |
 | `auditoria` | `fecha_utc`, `usuario_oid`, `rol`, `accion`, `entidad`, `entidad_id`, `ip`, `correlation_id`, `detalle` (JSON) |
+
+Ownership invariant: `coordinador_oid` is copied onto `sitio_contacto`, `sitio_visita`,
+`sitio_archivo` and `subida_sesion` so RLS can filter them without a join, and pending rows of
+`notificacion_outbox` are addressed to the owner. Every path that changes a site's owner (admin
+`reasignar`, a bulk reload with a new `USUARIO`) must call `sitios.cambiar_propietario`, which moves
+all of them in one transaction. Version invariant: any write that changes what a site *is* for a
+device (files published, retired or purged; a discard proposal; a return) locks the `sitio` row
+with `WITH (UPDLOCK, ROWLOCK)` and bumps `actualizado_utc` so `rowversion` moves and the delta
+reports the site. `notificacion_outbox.estado` also has `enviando` (claimed by a running outbox job;
+released after 15 minutes if the run died).
 
 ## 2. Row-level security
 

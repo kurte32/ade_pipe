@@ -6,6 +6,33 @@ are tagged `release-x.y.z` on `main` (the deploy workflow matches `release-*`; s
 
 ## Unreleased · branch `ux-redesign` (from `prod-readiness`)
 
+### Audit remediation (11 October 2026, `docs/audit/ENGINEERING_AUDIT_2026-10-11.md`)
+Fixed, with regression tests, everything the audit rated P1 and P2 that does not need Azure:
+- Ownership: a bulk reload that changes a site's coordinator moves contact, visit, files, open
+  uploads and pending notices (one helper shared with admin `reasignar`); reassignment to an
+  unknown oid is refused; discard proposals on terminal sites are refused.
+- Concurrency: file publish/retire/purge lock and bump the site (other devices get the change);
+  one `vigente` copy per document type (filtered unique index); the lote is locked on confirm;
+  the outbox job claims rows and commits per row; `alembic check` is clean and runs in CI.
+  SQLAlchemy's `with_for_update()` renders nothing on SQL Server, so every lock is an explicit
+  `UPDLOCK` hint, verified by an HTTP burst test.
+- Identity: the RLS session context uses the role the route is for; Admin is bound to the admin
+  SPA client id (`AUTH_ADMIN_AZP`); the deployment guard applies to every environment but `local`,
+  which is the only one that trusts the SQL certificate, serves docs or runs `e2e-cleanup`; the
+  image defaults to `ENVIRONMENT=production`; SQL parameters and Graph URLs never reach logs.
+- PWA: the local store belongs to one account and is cleared on an account change; every request
+  times out after 30 s; a site reassigned away takes its queued changes with it (and says so);
+  photo uploads read the live session after a replay; transient failures back off and never
+  become terminal; a Web Lock serialises tabs; MSAL errors map to offline or sign-in.
+- Admin: server-side queues (`en_revision_admin`, `devuelto`), the load review reads every page,
+  a 412 reloads the site, config errors render a message.
+- API: captures honour `If-Match` when sent; identical reloads keep the site's ETag; chunked
+  overflows answer 413 Problem Details; site ids are bounded; CHECK constraints and the missing FK.
+- Infrastructure and pipeline (static): admin SPA on its own Front Door host; dev SPA→API via
+  CORS and `VITE_API_BASE_URL`; SQL firewall and NSG rules for dev; control-plane digest
+  promotion; diagnostics for Front Door, Key Vault and storage; pinned base images; drift and
+  smoke-test parameters; prod after test; release tags promote the `main` digest; gitleaks allowlist.
+
 ### Changed
 - Both apps redesigned to the Tiendas 3B brand with a shared design system in `packages/ui`
   (tokens, `AppBar`, `PageHeader`, `Alert`, `Field`, `Modal` with focus trap, `StageIndicator`,

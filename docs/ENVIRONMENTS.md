@@ -16,14 +16,22 @@ adapters selected by configuration differ.
 | Telemetry | stdout JSON | stdout JSON | stdout JSON + Application Insights |
 | Jobs | `scheduler` compose service loop | run on demand in tests | Container Apps Jobs (cron) |
 
-`ENVIRONMENT=production` activates the guard in `backend/app/core/config.py`: the API refuses to start
-with any local substitute enabled.
+`ENVIRONMENT` has three values and the guard in `backend/app/core/config.py` keys on them:
+
+| Value | Where | What it means |
+|---|---|---|
+| `local` | compose stack, CI | The only value that may trust the SQL Server certificate, serve `/api/docs`, accept the dev identity provider and run `e2e-cleanup` |
+| `test` | Azure dev and test (UAT) | *Deployed*: Entra auth with the issuer and JWKS pinned to `login.microsoftonline.com`, managed identity to SQL, Azure storage, a real tenant id, `AUTH_ADMIN_AZP` set, `TEAMS_APP_ID` set when notifications use Graph. Substitute scan, notification and directory modes are allowed |
+| `production` | Azure prod | Everything `test` requires, plus Defender scanning and Graph notifications and directory |
+
+The container image defaults to `ENVIRONMENT=production`, so a container started without the
+variable fails closed. Deployed non-production never trusts an unvalidated certificate (audit IDN-2).
 
 ## Environment variables
 
 | Variable | Local (`.env`) | CI | Azure (source) |
 |---|---|---|---|
-| `ENVIRONMENT` | `local` | `local` | `production` (param `environmentName`; `test` env uses `test`) |
+| `ENVIRONMENT` | `local` | `local` | `production` (param `environmentName`; dev and test use `test`, see above) |
 | `LOG_LEVEL` | `INFO` | `INFO` | param `logLevel` |
 | `APP_PUBLIC_URL` | `http://localhost:5173` | same | param `appPublicUrl` (Front Door host) |
 | `DB_HOST` | `localhost` (compose sets `sqlserver` for containers) | `localhost` | SQL server FQDN (module output) |
@@ -37,6 +45,8 @@ with any local substitute enabled.
 | `AUTH_TENANT_ID` | dev GUID | dev GUID | param `authTenantId` |
 | `AUTH_AUDIENCE` | dev GUID | dev GUID | param `authAudience` (pipeline-api client id) |
 | `AUTH_ALLOWED_AZP` | two dev GUIDs | same | param `authAllowedAzp` |
+| `AUTH_ADMIN_AZP` | admin dev GUID | same | param `authAdminAzp`: Admin is honoured only from this client id, and that client never acts as Coordinador (required when deployed) |
+| `CORS_ALLOWED_ORIGINS` | empty | empty | empty behind Front Door; the two SWA hostnames when `deployFrontDoor=false` (dev), computed in `main.bicep` |
 | `AUTH_ISSUER` | `http://localhost:8001/<tenant>/v2.0` | same | `https://login.microsoftonline.com/<tenant>/v2.0` (computed) |
 | `AUTH_JWKS_URL` | dev-idp JWKS (compose overrides host) | `http://localhost:8001/...` | Entra discovery keys URL (computed) |
 | `DEV_IDP_URL` | `http://localhost:8001` | same | not set |

@@ -1,6 +1,6 @@
 # Comprehensive engineering audit · Pipeline de Posibles Tiendas
 
-Date: 11 October 2026 · Audited commit: `69f5b31` on branch `ux-redesign` (28 commits ahead of `main` and `origin/main`, 5 ahead of `prod-readiness`; working tree clean) · **Audience:** engineering lead, architect, release manager · **Status of this file:** written by the audit session, **not committed**; no source, configuration, migration or test file was modified.
+Date: 11 October 2026 · Audited commit: `69f5b31` on branch `ux-redesign` (28 commits ahead of `main` and `origin/main`, 5 ahead of `prod-readiness`; working tree clean) · **Audience:** engineering lead, architect, release manager · **Status of this file:** written by the audit session with no code change; committed afterwards together with the remediation (see §L).
 
 Method: one lead auditor plus four independent read-only auditors (identity and tenancy; data integrity and concurrency; frontend and offline sync; tests, CI and infrastructure), each told to work from code and running processes and to treat `docs/`, `docs/audit/` and `architecture/` as hypotheses. Every finding below was either reproduced against the local compose stack, read in the exact code path, or is marked *plausible*. The requirements come from `TDD_Pipeline_Tiendas_v0.1.pdf` itself (read in full), not from the repository's restatements.
 
@@ -532,3 +532,31 @@ Section D expands the data and sync defects. This appendix gives the full field 
 - **Expected vs actual:** queues list every site needing a decision; instead the newest sites (exactly those a load sends to review) are the ones dropped. Already noted as "attention queues cap" in `UX_VALIDATION.md` §4 at S3; the audit rates it P2 because the count is presented as authoritative.
 - **Fix:** server-side filters `en_revision_admin=true` / `devuelto=true` with counts, or a dedicated queue endpoint.
 - **Regression test:** 250 seeded sites with the flag on id 240; the queue shows it.
+
+
+---
+
+## L. Remediation status (same day, commits `2444a68` … `caa1612` on `ux-redesign`)
+
+Everything rated P1 and P2 that does not need Azure access was fixed with regression tests in six
+commits; gates on the last one: `make lint` clean, backend 183 passed, frontend unit 40, Playwright
+18, Bicep and actionlint clean, image builds with pinned digests. Azure-dependent items are
+implemented statically and will be verified by the first real `build-deploy` run (backlog
+`DEPLOY-RUN`).
+
+| Finding | Status | Where |
+|---|---|---|
+| DAT-1, DAT-4, DAT-5, DAT-6 | fixed (`sitios.cambiar_propietario`, 422s) | `2444a68` |
+| FE-1, FE-3, CI-1/DAT-8, LINT-1, DOC-1 | fixed | `2444a68` |
+| IDN-2, CI-4 (guard side) | fixed (`deployed` semantics, image default) | `1f47e7d` |
+| DAT-2, DAT-3, DAT-11/FE-5 | fixed (site lock and touch, filtered unique index, migration `b7c2e4a1d9f0`) | `1f47e7d`, hints corrected in `a2d8cc8` |
+| DAT-7 | fixed (row claims, per-row commit) | `1f47e7d`, hints in `a2d8cc8` |
+| FE-2, FE-4, API-1, TST-1, TST-2, TST-5 | fixed | `1f47e7d` |
+| IDN-1, IDN-3, IDN-4, IDN-5, IDN-7, IDN-9 | fixed | `a2d8cc8` |
+| DAT-9, DAT-10, DAT-12, DAT-14 (checks, FK), DAT-13 (expiry, legal-hold block) | fixed (migration `c9d1e2f3a4b5`) | `a2d8cc8` |
+| FE-6, FE-7, FE-8, FE-9, FE-11, FE-12, FE-13, FE-14, FE-15 | fixed | `47681d9` |
+| INF-1, INF-2, INF-3, INF-4, INF-5, CI-2, CI-3, CI-4 (smoke test), CI-5, CI-6, TST-3, TST-4 | implemented statically / fixed | `caa1612` |
+| Found during remediation: the new `avanzar` lock ran after the If-Match check, so a waiting request passed with the new version | fixed, caught by the TST-4 burst test | `caa1612` |
+| FE-10 | open by decision (captures stay unconditional unless the client sends If-Match) | backlog `FE-10` |
+| DAT-13 (mark-read, `escaneando`, send outcome), DAT-14 (`datetime2`), DAT-15, DAT-16, DAT-17, IDN-6, IDN-8, TST-4 (SPID), coverage tooling, CI service image pins | open, P3 | backlog §3 |
+| Azure verification of INF-1..4, CI-2..4; MSAL against a tenant; pen test; device test; screen-reader pass | needs the test environment | backlog §1–§2 |

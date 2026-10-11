@@ -161,11 +161,27 @@ Spec names must match `pwa.*.spec.ts` or `admin.*.spec.ts` (Playwright projects)
 (Playwright against `make up` + `pnpm dev`), gitleaks, Bicep build/lint, actionlint. Every action
 is pinned to a commit SHA. Locally: `make lint && make test && pnpm -r test && make e2e`.
 
-Test counts on this branch: backend 58 unit + 63 integration functions, frontend 28, Playwright 18.
+Test counts on this branch: backend 183 (111 unit, 72 integration; `pytest --collect-only -q -m integration`), frontend 40, Playwright 18. CI also runs `alembic check` after the upgrade.
 Every file under `tests/integration/` carries `pytestmark = pytest.mark.integration`, so
 `make test-unit` runs without the stack; keep the marker when adding a file there.
 
 ## 8. Things that are easy to get wrong
+
+- **`with_for_update()` renders nothing on SQL Server.** SQLAlchemy's mssql dialect silently drops
+  it. A row lock is a table hint: `select(Sitio).with_hint(Sitio, "WITH (UPDLOCK, ROWLOCK)")`,
+  and `READPAST` to skip rows another worker holds (the outbox claim). The audit found four
+  no-op locks this way; the HTTP burst test in `test_concurrency.py` is the guard.
+- **Lock, then re-read, then check the precondition.** A request that waited on the lock must
+  compare `If-Match` against the version the winner wrote, so `session.refresh(sitio)` comes
+  before `_require_if_match` (see `transiciones.avanzar`).
+- **Changing a site's owner means every owner-scoped row.** Use `sitios.cambiar_propietario`; never
+  assign `coordinador_oid` on the site alone (bulk reload used to, audit DAT-1).
+- **Writes outside `sitio` that change the site must touch it** (`_lock_sitio` in archivos),
+  otherwise other devices never receive the change through the delta.
+- **The PWA store belongs to one account.** `ensureOwner` clears it on an account change; any new
+  table in Dexie must be cleared in `clearLocalData` too.
+- **Every `api-client` request has a 30 s timeout** (`timeoutMs` to override). A timeout is a
+  transient `NetworkError`; the caller's own abort is rethrown.
 
 - Reading the coordinator from a request parameter instead of `claims.oid`.
 - Forgetting `auditoria.record` in a write path, or logging names, phones, emails, tokens or
