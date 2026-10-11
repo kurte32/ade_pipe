@@ -102,3 +102,25 @@ Cost: Actions minutes; disposable SQL for integration tests kept small and auto-
 - [ ] Federated credentials and role assignments per environment.
 - [ ] Migration job definition with a separate migration identity.
 - [ ] Confirm pendiente 12 with TI and swap workflow syntax if needed.
+
+## Addendum (2026-10-11): implementation after the independent audit
+
+The audit found the pipeline as first written could not perform a correct dev → test → prod
+deployment. The implemented design now matches this ADR's intent:
+
+- **Migration before traffic.** The new revision is created with 0% traffic (Bicep parameter
+  `trafficRevision` pins traffic to the revision serving now), the migration job runs, the workflow
+  waits for the revision to be healthy, then shifts traffic. A failure after the shift restores the
+  previous revision automatically.
+- **Build once, promote.** Per-environment registries are kept; deployments import the exact
+  dev-built digest with `az acr import` and verify it. SPA bundles are built once without tenant or
+  client ids and read them at runtime from a per-environment `config.json`; only the ids can come
+  from that file, the auth mode stays compile-time.
+- **CI as a gate.** `build-deploy` calls `ci.yml` as its first job; nothing is built or deployed
+  when lint, tests, secret scan or Bicep validation fail. CI also runs the Playwright suite against
+  the compose stack and lints the workflows with actionlint.
+- **Supply chain.** Every action is pinned to a commit SHA and the Bicep CLI to a version with a
+  checksum.
+
+None of this has run in Azure yet; it is statically validated (Phase 3 of
+`docs/audit/PRODUCTION_READINESS_PLAN.md`).

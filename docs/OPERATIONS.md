@@ -75,7 +75,9 @@ Runs daily. Review `SELECT COUNT(*) FROM sitio_archivo WHERE estado = 'purgado' 
 Azure: point-in-time restore of the Azure SQL database to a new database name, then repoint the API by updating the `DB_HOST`/`DB_NAME` container-app environment variables (they are plain env vars, not a Key Vault reference) and redeploy. Ledger tables keep their digests; external digest storage is not configured in this build, so `sys.sp_verify_database_ledger` validates only the in-database digest. Local: `make reset && make up && make db-seed`.
 
 ### RB-09 Rolling back a release
-The container app runs in multiple-revision mode and keeps the previous revision active.
+The container app runs in multiple-revision mode and keeps the previous revision active. A
+deployment only shifts traffic after the migration job succeeded and the new revision is healthy,
+and it restores the previous revision automatically if a later step fails. To roll back by hand,
 `az containerapp ingress traffic set -g <rg> -n ca-pipeline-api-<env> --revision-weight <previous>=100`
 moves all traffic back within seconds. Migrations are expand-and-contract, so the previous
 revision runs against the new schema. Never run `alembic downgrade` in production without a

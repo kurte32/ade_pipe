@@ -61,9 +61,19 @@ registrations.
    az role assignment create --assignee "$APP" --role AcrPush --scope "<acr resource id>"   # after ACR exists
    ```
 
+   For `test` and `prod`, the principal also needs `AcrPull` on the **dev** registry: deployments
+   import the exact dev-built digest with `az acr import` instead of rebuilding.
+
    GitHub environment secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`. Variables:
    `ACR_NAME`, `RESOURCE_GROUP`, `VITE_TENANT_ID`, `VITE_API_CLIENT_ID`, `VITE_SPA_CLIENT_ID_PWA`,
-   `VITE_SPA_CLIENT_ID_ADMIN`, `PUBLIC_HOST`. Required reviewers on `test` and `prod`.
+   `VITE_SPA_CLIENT_ID_ADMIN`, `PUBLIC_HOST`, and for `dev` only `DEV_ALLOWED_INGRESS_CIDRS`
+   (comma-separated office/VPN ranges; when unset the dev API admits nothing from outside). The four
+   `VITE_*` values are written into each SPA's `config.json` at deploy time; they are not compiled
+   into the bundles. Required reviewers on `test` and `prod`.
+
+   Repository settings (manual, not in code): branch protection on `main` requiring the `ci`
+   checks to pass before merge. `build-deploy` additionally runs CI as its first job and will not
+   build or deploy when it fails.
 4. **Defender for Storage** plan available in the subscription (per-storage-account enablement is in the
    template; the plan and its cost must be approved by Seguridad and TI).
 5. **Fabric**: workspace with capacity, workspace identity, and tenant settings for trusted workspace
@@ -124,9 +134,32 @@ Production-only values are fixed in the template (`AUTH_MODE=entra`, `DB_AUTH=en
 `STORAGE_MODE=azure`, `SCAN_MODE=defender`, `NOTIFY_MODE=graph`, `DIRECTORY_MODE=graph`). The
 application refuses to start otherwise when `ENVIRONMENT=production`. `AZURE_CLIENT_ID` selects the
 user-assigned identity for `DefaultAzureCredential`. The App Insights connection string is a Key Vault
-reference resolved by the Container Apps platform with the API identity.
+reference resolved by the Container Apps platform with each app's or job's own identity; both the
+API identity and the migration identity hold Key Vault Secrets User.
 
-## 5. Migration job
+`TRUSTED_PROXY_HOPS` is set from `deployFrontDoor` (2 with Front Door, 1 without) and decides which
+`X-Forwarded-For` entry is recorded as the client address in the audit ledger. Confirm the real hop
+count in the test environment by comparing a request's ledger IP with the caller's address.
+
+The SPAs are built once, environment-neutral (`VITE_AUTH_MODE=msal` only). At startup they read
+`<base>/config.json`, which the deployment writes per environment. Only the tenant and client ids can
+come from that file; the auth mode stays compile-time, so a deployed file cannot enable the dev
+sign-in. Without the file a production bundle refuses to start.
+
+## 5. Deployment order and migration job
+
+`deploy-environment.yml` runs, per environment:
+
+1. Import the digest into the environment's registry when it differs from the build registry, and
+   verify the digest after import.
+2. Read the revision serving traffic now and pass it as `trafficRevision`, so the Bicep deployment
+   creates the new revision with **0%** traffic (on the very first deployment there is no previous
+   revision and the new one takes all traffic).
+3. Run the migration job and wait for it.
+4. Wait until the new revision reports `Healthy`, then shift 100% of traffic to it.
+5. Write each SPA's `config.json`, deploy both SPAs, run the smoke test.
+6. If any step after the shift fails, traffic is moved back to the previous revision automatically.
+
 
 `caj-pipeline-migrate-{env}` runs `alembic upgrade head` from the same image as the API, with the
 migration identity (`AZURE_CLIENT_ID` of `id-pipeline-migrate-{env}`) and `DB_USER` set to the API
@@ -168,10 +201,11 @@ Update `appPublicUrl` in the parameter file once the host is known; it is used i
 
 ## 9. Rollback
 
-- **API**: the container app runs in multiple-revision mode with traffic on the latest revision;
-  each deployment keeps the previous revision active. Roll back with
+- **API**: the container app runs in multiple-revision mode and each deployment keeps the previous
+  revision active. A failure after the traffic shift restores the previous revision automatically
+  (step 6 above); otherwise roll back with
   `az containerapp ingress traffic set -g <rg> -n ca-pipeline-api-<env> --revision-weight <previous>=100`
-  (revision names are printed by the "Record current revision" step). Migrations are
+  (the previous revision name is printed by the "Revision serving traffic now" step). Migrations are
   expand-and-contract, so the previous revision runs against the new schema. If the previous
   revision was deactivated, re-run `build-deploy` with `workflow_dispatch`, `target=<env>` and
   `image_digest=<previous digest>`.
@@ -194,7 +228,9 @@ reserved for 90 days.
 | Item | Status |
 |---|---|
 | All Bicep modules and parameter files build and lint | statically validated (`bash infra/bicep/validate.sh`, Bicep 0.48.1) |
-| GitHub workflows YAML | statically validated (YAML parse, actionlint where available) |
+| GitHub workflows | statically validated (actionlint 1.7.12 clean locally and as a CI job; every action pinned to a commit SHA; Bicep CLI pinned with a checksum). Never executed on GitHub. |
+| Deployment order (0% revision, migrate, health, shift, automatic rollback) | statically validated; not verified in Azure |
+| Image digest promotion with `az acr import`; per-environment SPA `config.json` | runtime config verified locally in a production build; import not verified in Azure |
 | Resource deployment to a subscription | not verified in Azure |
 | Front Door Private Link origin approval to Container Apps | not verified in Azure |
 | Defender for Storage on-upload scanning and index tags | not verified in Azure |
