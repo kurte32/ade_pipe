@@ -32,6 +32,8 @@ jobs:
     env:
       ENV: ${{ inputs.environment }}
       RG: ${{ vars.RESOURCE_GROUP }}
+      # dev only: office/VPN CIDRs for the public ingress (fail-closed when unset, audit D-07)
+      DEV_ALLOWED_INGRESS_CIDRS: ${{ vars.DEV_ALLOWED_INGRESS_CIDRS }}
       IMAGE: ${{ vars.ACR_NAME }}.azurecr.io/pipeline-api@${{ inputs.image_digest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
