@@ -59,3 +59,24 @@
 .helper { color: var(--color-muted); font-size: var(--text-sm); }
 .aud-user { display: block; }
 .aud-user small { color: var(--color-muted); }
+
+/* Sites table as cards on phones (UX-TABLES): each cell carries its header in data-label. */
+@media (max-width: 599px) {
+  .table-wrap:has(.table-cards) table { min-width: 0; }
+  .table-cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .table-cards tbody tr { display: grid; grid-template-columns: 1fr 1fr; gap: 2px var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+  .table-cards td { display: block; border: 0; padding: 0; }
+  .table-cards td::before { content: attr(data-label); display: block; font-size: var(--text-xs); color: var(--color-muted); font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; }
+  .table-cards td.cell-name { grid-column: 1 / -1; font-size: var(--text-md); }
+  .table-cards td.cell-name::before { display: none; }
+  .table-cards td.num { order: 9; }
+  .table-cards td.nowrap { white-space: normal; }
+  .table-cards td:empty { display: none; }
+}
+/* "Últimas cargas" rows at phone width (UX-CARGAS): the state tag sits under the title instead of squeezing it. */
+@media (max-width: 599px) {
+  .card .list-row { flex-wrap: wrap; }
+  .card .list-row .body { flex-basis: calc(100% - 32px); }
+  .card .list-row > .tag { order: 3; margin-left: 0; }
+  .card .list-row .chev { order: 2; }
+}

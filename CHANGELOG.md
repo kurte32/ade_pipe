@@ -35,6 +35,12 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   range and unknown-unit `Range` headers ignored instead of 416; the pooled-connection RLS test
   asserts one connection; four Azure Monitor alert rules in Bicep; CI service images and the
   compose stack pinned to SQL Server 2022 CU27 and Azurite 3.35.0; backend coverage gate (80 %).
+- Backlog sweep: oversized workbooks refused from the sheet dimension tag (154 ms for 100k rows);
+  `/readyz` reports the applied schema revision versus the code's head; every business timestamp
+  is `datetime2(3)` (migration `e5f6a7b8c9d0`); load values are stored as the file has them
+  (formula neutralisation is for exports); admin sites table as cards on phones; "Últimas cargas"
+  rows tidy at phone width; audit actions explained in a tooltip and in the filter list; the
+  design documents reconciled with the code (health paths, log field, immutability, threshold).
 - Authenticated OWASP ZAP active scan of the whole API contract: 0 failures, 0 warnings over 120 URLs.
 - `e2e/tools/net-timing.mjs`: time to the site list on emulated 4G and 3G (2.5 s / 1.7 s warm on
   slow 4G); Lighthouse on the built PWA: 92 / 100 / 100 / 82.

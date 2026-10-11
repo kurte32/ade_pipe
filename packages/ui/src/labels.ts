@@ -53,6 +53,11 @@ export const AUDITORIA_ACCIONES = [
   "archivo_retirado",
   "archivo_descargado",
   "archivo_purgado",
+  "subida_expirada",
+  "subida_escaneando",
+  "purga_bloqueada",
+  "notificacion_enviada",
+  "notificacion_fallida",
 ];
 
 export const AUDITORIA_ENTIDADES = ["sitio", "carga_lote", "coordinador_equivalencia", "sitio_archivo", "subida_sesion"];
@@ -72,3 +77,31 @@ export function formatMb(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/** Plain-language meaning of each audit action, for tooltips and the filter list (UX-AUDIT). */
+export const AUDITORIA_ACCION_LABELS: Record<string, string> = {
+  contacto_capturado: "El coordinador guardó el contacto del dueño",
+  visita_capturada: "El coordinador guardó las medidas de la visita",
+  transicion: "El coordinador avanzó el estatus del sitio",
+  descarte_propuesto: "El coordinador propuso descartar el sitio",
+  devolucion: "El administrador devolvió el sitio a un estatus anterior",
+  descarte: "El administrador descartó el sitio",
+  reasignacion: "El sitio cambió de coordinador",
+  carga_creada: "Se subió un archivo de carga (vista previa)",
+  carga_decision: "El administrador aprobó o excluyó filas con advertencia",
+  carga_confirmada: "La carga se confirmó y sus filas entraron al pipeline",
+  carga_cancelada: "La carga se canceló sin confirmar",
+  equivalencia_actualizada: "Cambió la tabla usuario → correo",
+  subida_iniciada: "Empezó la subida de un archivo",
+  subida_cancelada: "Se canceló una subida",
+  subida_expirada: "Una subida sin terminar expiró y se limpió",
+  subida_escaneando: "El archivo espera el resultado del antimalware",
+  archivo_publicado: "El archivo quedó validado y guardado",
+  archivo_retirado: "El coordinador retiró un archivo (versión no vigente)",
+  archivo_descargado: "Alguien descargó un archivo",
+  archivo_rechazado_malware: "El antimalware rechazó un archivo",
+  archivo_purgado: "La retención purgó un archivo",
+  purga_bloqueada: "Una retención legal impidió purgar un archivo",
+  notificacion_enviada: "Se envió el aviso de Teams",
+  notificacion_fallida: "El aviso de Teams agotó sus reintentos",
+};

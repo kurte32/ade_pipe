@@ -32,7 +32,7 @@ All API and job logs are JSON lines sent to Application Insights through OpenTel
 |---|---|---|
 | `timestamp` (UTC), `level`, `logger`, `message` | Yes | Standard |
 | `trace_id`, `span_id`, `correlation_id` | Yes | W3C trace context; `correlation_id` is returned to the client in every response header |
-| `user_oid`, `user_role` | Yes on authenticated requests | Entra object id only; never name or email |
+| `user` | Yes on authenticated requests | 16-character hash of the Entra object id (implemented choice: the raw oid is in the audit ledger, not in telemetry); never name or email |
 | `sitio_id`, `lote_id`, `subida_id`, `operacion_key` | When relevant | Business identifiers, not business content |
 | `route`, `status_code`, `duration_ms` | Yes on requests | |
 | `env`, `revision`, `job_name` | Yes | For correlating with deployments |
@@ -109,10 +109,10 @@ Alerts route to an on-call channel (Teams channel plus email; paging tool is Ope
 
 | Probe | Path | Checks | Container Apps configuration (Recommendation; verify defaults) |
 |---|---|---|---|
-| Liveness | `GET /healthz/live` | Process responds; no dependencies | Startup grace then periodic; failure restarts the replica |
-| Readiness | `GET /healthz/ready` | SQL `SELECT 1` with the application user, `st-stg` and `st-doc` container metadata read, Key Vault secret list permission check, JWKS cache populated | Failure removes the replica from ingress without restart |
-| Startup | `GET /healthz/ready` | Same as readiness | Longer threshold to cover Alembic check and JWKS fetch |
-| Dependency detail | `GET /healthz/deps` (Admin role only) | Per-dependency status and latency including Graph token acquisition and Defender tag read | Not used by probes; for runbooks |
+| Liveness | `GET /healthz` | Process responds; no dependencies | Startup grace then periodic; failure restarts the replica |
+| Readiness | `GET /readyz` | SQL `SELECT 1` with the application user, the applied schema revision against the code's head (degraded when the database is behind), both storage containers | Failure removes the replica from ingress without restart |
+| Startup | `GET /readyz` | Same as readiness | Longer threshold to cover the JWKS fetch |
+| Dependency detail | `GET /healthz/deps` (Admin role only) | Per-dependency status and latency: database, storage, JWKS, Graph when in use | Not used by probes; for runbooks |
 
 Jobs expose completion status through their exit code and a final structured log line; Container Apps job history is the health signal.
 
@@ -145,7 +145,7 @@ Front Door health probe targets `GET /healthz/ready` through the Private Link or
 
 **Azure SQL.** Automated backups with zone-redundant backup storage; point-in-time restore within the automated retention window; long-term retention of weekly backups aligned with the five-year document retention (Assumption; align with Legal pendiente 7). Ledger tables keep their digest history; verify digest after any restore.
 
-**Storage.** `st-doc`: version-level immutability with the five-year time-based policy and legal hold procedure (ADR-003); soft delete for blobs and containers; blob versioning; geo-redundant storage. `st-stg`: soft delete only, 7-day lifecycle deletion of abandoned sessions. Immutable blobs cannot be deleted by the application or an operator within the retention period, which is the primary protection against ransomware-style deletion.
+**Storage.** `st-doc`: container-level time-based immutability for the five-year policy plus the legal hold procedure (ADR-003 addendum: blob versioning, and therefore version-level immutability, is unavailable on a hierarchical-namespace account); soft delete for blobs and containers; geo-redundant storage. `st-stg`: soft delete only, 7-day lifecycle deletion of abandoned sessions. Immutable blobs cannot be deleted by the application or an operator within the retention period, which is the primary protection against ransomware-style deletion.
 
 **Configuration and code.** Bicep, Alembic migrations, and workflow definitions are in git; a full environment is reproducible from the repository plus the Entra registrations held by the identity team.
 

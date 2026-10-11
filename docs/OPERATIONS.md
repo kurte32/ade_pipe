@@ -143,4 +143,4 @@ in the test environment. Logs carry `duration_ms`, `revision`, `sitio_id`/`lote_
 /`subida_id` from the route, and `job_name`/`job_run` on job lines. An administrator can call
 `GET /healthz/deps` for dependency reachability with latency.
 
-Readiness probe failures, HTTP 5xx rate above 1 % over 5 minutes, `promote` sessions waiting over `SCAN_WAIT_SECONDS`, outbox `fallida` count increasing, purge job failures, SQL DTU/vCore above 80 %, and any `unhandled_error` log event. Exact thresholds and routing are in `architecture/PRODUCTION_READINESS.md`.
+Readiness probe failures, HTTP 5xx rate above 5 % over 10 minutes (the Bicep alert rule and `architecture/PRODUCTION_READINESS.md` §2.5), `promote` sessions waiting over `SCAN_WAIT_SECONDS`, outbox `fallida` count increasing, purge job failures, SQL DTU/vCore above 80 %, and any `unhandled_error` log event. Exact thresholds and routing are in `architecture/PRODUCTION_READINESS.md`.

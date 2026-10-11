@@ -111,7 +111,7 @@ export function Sitios() {
       {q.data ? (
         <>
           <div className="table-wrap">
-            <table data-testid="sitios-table">
+            <table data-testid="sitios-table" className="table-cards">
               <thead>
                 <tr>
                   <th scope="col">#</th>
@@ -129,20 +129,20 @@ export function Sitios() {
               <tbody>
                 {items.map((s) => (
                   <tr key={s.id} data-testid={`sitio-row-${s.id}`} className={s.en_revision_admin ? "is-attention" : undefined}>
-                    <td className="num">{s.origen_id}</td>
-                    <td className="cell-name">
+                    <td className="num" data-label="#">{s.origen_id}</td>
+                    <td className="cell-name" data-label="Nombre">
                       <Link to={`/sitios/${s.id}`}>{s.nombre}</Link>
                       {!s.vigente ? <span className="tag tag-muted" style={{ marginLeft: 6 }}>no vigente</span> : null}
                     </td>
-                    <td>{s.region}</td>
-                    <td>
+                    <td data-label="Región">{s.region}</td>
+                    <td data-label="Estatus">
                       <EstatusBadge estatus={s.estatus} devuelto={s.devuelto} />
                     </td>
-                    <td title={coords.nombre(s.usuario_codigo)}>
+                    <td title={coords.nombre(s.usuario_codigo)} data-label="Coordinador">
                       <span data-testid="col-coordinador">{s.usuario_codigo}</span>
                       {coords.byCode[s.usuario_codigo]?.nombre ? <span className="muted"> · {coords.byCode[s.usuario_codigo]?.nombre?.split(" ")[0]}</span> : null}
                     </td>
-                    <td className="cell-tight">
+                    <td className="cell-tight" data-label="Campos">
                       <span className="campos" title={`${s.campos_capturados} de ${s.campos_total} campos con dato en el archivo`}>
                         <span className="bar" aria-hidden="true">
                           <i style={{ width: `${Math.round((s.campos_capturados / Math.max(1, s.campos_total)) * 100)}%` }} />
@@ -150,8 +150,8 @@ export function Sitios() {
                         {s.campos_capturados}/{s.campos_total}
                       </span>
                     </td>
-                    <td className="nowrap">{formatMexicoCity(s.actualizado_utc)}</td>
-                    <td>{s.en_revision_admin ? <span className="tag tag-warning">pendiente</span> : ""}</td>
+                    <td className="nowrap" data-label="Actualizado">{formatMexicoCity(s.actualizado_utc)}</td>
+                    <td data-label="Revisión">{s.en_revision_admin ? <span className="tag tag-warning">pendiente</span> : ""}</td>
                   </tr>
                 ))}
               </tbody>

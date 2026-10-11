@@ -62,14 +62,9 @@ depends on third parties).
 
 | Id | Item | Prio | Effort | Source |
 |---|---|---|---|---|
-| B-04r | Bulk load: reject a 100k-row XLSX in under 2 s (today 4.8 s) | P2 | M | REMEDIATION_PLAN second pass |
-| D-03r | `/readyz` cannot read `alembic_version` with the app role; expose the applied revision another way (startup log or a grant on a view) | P2 | S | PRODUCTION_READINESS_PLAN progress |
 | LEDGER-DIGEST | Configure external ledger digest storage so `sp_verify_database_ledger` checks against an immutable copy | P2 | S | OPERATIONS RB-08 |
 | XLS-REAL | Verify `.xls` parsing with a real legacy file from the business | P2 | S | DELIVERY_REPORT §9 |
 | UX-SR | Screen-reader pass (TalkBack, NVDA); the axe WCAG 2 A/AA scan runs in the two a11y e2e specs since 11 October | P1 | M | ux/UX_VALIDATION §3 |
-| UX-TABLES | Card layout for the admin sites table on phones | P3 | M | ux/UX_VALIDATION §4 |
-| UX-CARGAS | Tidy the "Últimas cargas" rows at 390 px | P3 | S | ux/UX_VALIDATION §4 |
-| UX-AUDIT | Glossary tooltip for audit action codes | P3 | S | ux/UX_VALIDATION §4 |
 | UX-LOGO | Replace the re-created roundel with the official vector logo and a raster icon set for the manifest | P1 (Mercadotecnia) | S | ux/DESIGN_SYSTEM §1 |
 | SCHED | Local scheduler uses fixed intervals, Azure uses cron; document only (accepted) | P3 | — | DELIVERY_REPORT §9 |
 
@@ -81,8 +76,6 @@ what the engineering audit of the same day left open (`docs/audit/ENGINEERING_AU
 |---|---|---|---|---|
 | ENTREGADO | Status `entregado` is seeded as terminal but no code path assigns it; either add the admin action or drop it from the catalog once Negocio decides (pendiente Q5). Audit DAT-15 | P2 | S | `backend/app/models.py`, `transiciones/service.py` |
 | FE-10 | A contact or visit queued before a transition is sent unconditionally and its new ETag is recorded as "ours", so an admin change made in between is not surfaced as a 412 on the transition. Deliberate trade-off (offline devices rarely hold a fresh ETag; the backend now honours `If-Match` on captures when sent); decide whether captures should carry `etagBase` once the pilot shows how often admins change sites mid-capture | P3 | S | `apps/pwa-coordinador/src/sync/engine.ts` |
-| DAT-17 | `neutralize()` prefixes `'` to cells starting with `= + - @` at load time (into staging originals); the TDD asks for neutralisation on export, and there is no export. Harmless today; revisit when an export exists | P3 | S | `backend/app/modules/cargas/validation.py` |
-| DAT-14b | Business tables use `datetime` (3.33 ms) while ledgers use `datetime2(3)`; a `datetime2` migration is a broad ALTER and was deferred | P3 | M | migration |
 | DAT-13b | Still unaudited write: marking a notification read (user-facing read state; outbox outcomes and the `escaneando` transition are audited since 11 October) | P3 | S | `notificaciones/service.py`, `archivos/service.py`, `jobs/outbox.py` |
 | E2E-ENTRA | No automated acceptance run against an Entra-protected environment (Playwright signs in through the dev picker only) | P1 | M | `e2e/helpers/auth.ts` |
 
@@ -96,19 +89,13 @@ what the engineering audit of the same day left open (`docs/audit/ENGINEERING_AU
 | Dashboard for regional managers (Power BI on Fabric) | Out of scope for v1 by TDD 2.2 | TO_BE §1 |
 | AI inspection of uploaded documents | Explicitly deferred by the TDD | TO_BE §1 |
 
-## 5. Documentation inconsistencies to resolve
+## 5. Documentation inconsistencies
 
-Found while consolidating; each needs one owner to pick a source of truth.
-
-| Topic | Says A | Says B |
-|---|---|---|
-| Workflows on GitHub | `AZURE_DEPLOYMENT.md` §11: never executed on GitHub | `PRODUCTION_READINESS_PLAN.md`: CI passed on GitHub (PR #2); only the deploy workflows have not run. B is current. |
-| Health endpoints | `OPERATIONS.md`: `/healthz`, `/readyz` (implemented) | `architecture/PRODUCTION_READINESS.md` §3: `/healthz/live`, `/healthz/ready`, `/healthz/deps` (design). Code wins; see HEALTH-DEPS. |
-| Runbook numbering | `OPERATIONS.md` RB-01…RB-10 | `PRODUCTION_READINESS.md` RB-01…RB-15 with different titles. See RUNBOOKS. |
-| 5xx alert threshold | `OPERATIONS.md`: 1 % over 5 min | `PRODUCTION_READINESS.md` §2.5: 5 % over 10 min |
-| Log user field | `OPERATIONS.md`: `user` = 16-char hash | `PRODUCTION_READINESS.md` §2.1: `user_oid`, `user_role` |
-| Storage immutability | `TO_BE.md` §5, `PRODUCTION_READINESS.md` §5: version-level with versioning | `OPERATIONS.md`, `AZURE_DEPLOYMENT.md` §11, ADR-003 addendum: container-level, versioning off. B is current. |
-| Branch of the latest work | `DELIVERY_REPORT.md` header: `implementation` | `IMPLEMENTATION_STATUS.md`, `REMEDIATION_PLAN.md`: `prod-readiness`; UX work on `ux-redesign` |
+Resolved on 11 October 2026: the design documents now state the implemented health paths
+(`/healthz`, `/readyz`, `/healthz/deps`), the `user` hash log field, container-level storage
+immutability, the 5 % / 10 min 5xx threshold, the runbook numbering RB-01 to RB-16, and that CI
+runs on GitHub while the deploy workflows have not. When a design document and the code disagree
+again, the code wins and the document gets the correction in the same PR.
 
 ## 6. Pending business decisions (summary; detail in `architecture/TO_BE.md` §9–10)
 

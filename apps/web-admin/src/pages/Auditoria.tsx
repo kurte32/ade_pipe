@@ -1,5 +1,5 @@
 import { useAuth } from "@pipeline/auth/react";
-import { AUDITORIA_ACCIONES, AUDITORIA_ENTIDADES, Icon, PageHeader, ProblemAlert, Spinner, formatMexicoCity, usePageTitle } from "@pipeline/ui";
+import { AUDITORIA_ACCION_LABELS, AUDITORIA_ACCIONES, AUDITORIA_ENTIDADES, Icon, PageHeader, ProblemAlert, Spinner, formatMexicoCity, usePageTitle } from "@pipeline/ui";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -98,7 +98,7 @@ export function Auditoria() {
           <input value={draft.accion} list="aud-acciones" data-testid="aud-accion" onChange={(e) => setDraft({ ...draft, accion: e.target.value })} placeholder="Todas" />
           <datalist id="aud-acciones">
             {AUDITORIA_ACCIONES.map((a) => (
-              <option key={a} value={a} />
+              <option key={a} value={a} label={AUDITORIA_ACCION_LABELS[a]} />
             ))}
           </datalist>
         </label>
@@ -174,7 +174,9 @@ export function Auditoria() {
                       </span>
                     </td>
                     <td>
-                      <code>{a.accion}</code>
+                      <code title={AUDITORIA_ACCION_LABELS[a.accion] ?? a.accion} style={{ cursor: "help" }}>
+                        {a.accion}
+                      </code>
                     </td>
                     <td>{a.entidad}</td>
                     <td className="cell-id">{a.entidad_id}</td>
