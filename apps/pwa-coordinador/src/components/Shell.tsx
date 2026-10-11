@@ -156,7 +156,7 @@ export function Shell({ children, onRequestLogin }: { children: ReactNode; onReq
             <button type="button" className="secondary" onClick={() => setConfirmSalir(false)}>
               Cancelar
             </button>
-            {sync.online ? (
+            {sync.online && sync.pendingCount ? (
               <button type="button" onClick={() => void sincronizarPrimero()}>
                 Sincronizar primero
               </button>

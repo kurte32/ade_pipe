@@ -27,7 +27,10 @@ are tagged `release-x.y.z` on `main` (the deploy workflow matches `release-*`; s
   ("Sincronizar primero" / "Salir y borrar"); it still signs out directly when the phone is up to
   date. New e2e `pwa.salir.spec.ts`.
 - API: `HEAD /archivos/{id}` is now routed (it answered 405) and returns the download headers
-  without recording a download in the audit log.
+  without recording a download in the audit log. The download is now recorded after the `Range`
+  check, so a 416 response is no longer audited as a download either.
+- `Modal`: the mount effect no longer depends on `onClose`, so a parent re-render (the sync chip
+  updating behind the sign-out dialog) no longer moves focus back to the close button.
 - Backend tests: `test_concurrency.py` carries the `integration` marker, so `make test-unit` runs
   without the stack.
 

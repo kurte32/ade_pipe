@@ -170,10 +170,24 @@ def test_resumable_three_part_pdf_roundtrip(
     )
     assert part.status_code == 206 and part.content == data[10:20]
     assert part.headers["content-range"] == f"bytes 10-19/{len(data)}"
+    def descargas() -> int:
+        with system_session() as s:
+            return len(
+                s.execute(
+                    select(Auditoria).where(
+                        Auditoria.entidad == "sitio_archivo",
+                        Auditoria.entidad_id == aid,
+                        Auditoria.accion == "archivo_descargado",
+                    )
+                ).all()
+            )
+
+    before = descargas()
     bad = client.get(
         f"/api/v1/archivos/{aid}", headers={**coord_a_headers, "Range": f"bytes={len(data)}-"}
     )
     assert bad.status_code == 416
+    assert descargas() == before  # no bytes left the server, so no download is recorded
     assert client.get(f"/api/v1/archivos/{aid}", headers=coord_b_headers).status_code == 404
     assert (
         client.get(f"/api/v1/archivos/{aid}/meta", headers=coord_a_headers).json()[
