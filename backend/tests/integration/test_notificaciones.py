@@ -90,7 +90,8 @@ def test_outbox_retries_with_backoff(
         ).one()
     assert row.intentos == 1
     assert row.estado == "pendiente"
-    assert row.ultimo_error.startswith("RuntimeError")
+    assert row.ultimo_error == "RuntimeError"  # unknown message text is not persisted (C9)
+    assert "secret" not in row.ultimo_error
     assert row.siguiente_intento_utc > row.creado_utc
     # not due yet, so a second run does not touch it
     outbox.run()
