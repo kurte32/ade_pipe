@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { PipelineDb } from "../db/schema";
 import type { SitioDetail } from "../lib/types";
-import { META_MAX_ROWVERSION, enqueue, pullDelta, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
+import { META_MAX_ROWVERSION, META_OWNER_OID, ensureOwner, enqueue, pullDelta, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
 
 function detail(id: number, estatus: string, etag: string, extra: Partial<SitioDetail> = {}): SitioDetail {
   return {
@@ -286,5 +286,35 @@ describe("sync engine", () => {
     await pullDelta(deps);
     const second = api.calls.filter((c) => c.path.startsWith("/api/v1/sitios/delta"))[1];
     expect(second?.path).toContain("desde=00000000000000ff");
+  });
+});
+
+describe("ensureOwner (FE-1: one store per account)", () => {
+  it("clears sites, queued ops and the delta cursor when a different account signs in", async () => {
+    const db = new PipelineDb(`owner-${Math.random()}`);
+    await db.sitios.put({ id: 1, nombre: "A", estatus: "sitio_prospectado", etag: "e1" } as never);
+    await enqueue({ api: new FakeApi(), db }, 1, "contacto", { nombre: "Ana", telefono: "2281234567", correo: null, notas: null });
+    await db.meta.put({ key: META_MAX_ROWVERSION, value: "00ff" });
+    await db.meta.put({ key: META_OWNER_OID, value: "oid-a" });
+
+    expect(await ensureOwner(db, "oid-b")).toBe(true);
+    expect(await db.sitios.count()).toBe(0);
+    expect(await db.operaciones.count()).toBe(0);
+    expect((await db.meta.get(META_MAX_ROWVERSION))?.value).toBeUndefined();
+    expect((await db.meta.get(META_OWNER_OID))?.value).toBe("oid-b");
+  });
+
+  it("keeps everything when the same account signs in again", async () => {
+    const db = new PipelineDb(`owner-${Math.random()}`);
+    await db.sitios.put({ id: 1, nombre: "A", estatus: "sitio_prospectado", etag: "e1" } as never);
+    await db.meta.put({ key: META_OWNER_OID, value: "oid-a" });
+    expect(await ensureOwner(db, "oid-a")).toBe(false);
+    expect(await db.sitios.count()).toBe(1);
+  });
+
+  it("claims an unowned store (first sign-in) without data loss on the first run", async () => {
+    const db = new PipelineDb(`owner-${Math.random()}`);
+    expect(await ensureOwner(db, "oid-a")).toBe(true);
+    expect((await db.meta.get(META_OWNER_OID))?.value).toBe("oid-a");
   });
 });

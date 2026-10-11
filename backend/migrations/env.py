@@ -24,6 +24,10 @@ def include_object(
 ) -> bool:
     if type_ == "table" and name in LEDGER_TABLES:
         return False
+    # sitio.rowversion is mapped with system=True (SQL Server fills it); autogenerate cannot see
+    # system columns and would emit drop_column for it, removing the ETag/If-Match basis.
+    if type_ == "column" and name == "rowversion":
+        return False
     return True
 
 

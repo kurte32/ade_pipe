@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, true, update
+from sqlalchemy import select, true
 from sqlalchemy.orm import Session
 
 from app.core.clock import to_utc_naive, utcnow
@@ -20,11 +20,9 @@ from app.models import (
     Estatus,
     MotivoDevolucion,
     Sitio,
-    SitioArchivo,
     SitioContacto,
     SitioEstatusHistorial,
     SitioVisita,
-    SubidaSesion,
 )
 from app.modules.auditoria import service as auditoria
 from app.modules.notificaciones import service as notificaciones
@@ -223,6 +221,9 @@ def avanzar(
     destino = data.estatus_destino
 
     if destino == ESTATUS_DESCARTADO:
+        if sitio.estatus not in ESTATUS_ORDER:
+            # A proposal on a terminal site would park it in admin review forever (audit DAT-6).
+            raise unprocessable("El sitio está en un estatus terminal")
         if not (data.comentario or "").strip():
             raise unprocessable("Indica el motivo para proponer el descarte")
         _require_if_match(sitio, if_match, claims)
@@ -407,16 +408,15 @@ def reasignar(
             CoordinadorEquivalencia.oid == nuevo, CoordinadorEquivalencia.activo == true()
         )
     ).scalar_one_or_none()
-    sitio.coordinador_oid = nuevo
-    if equiv is not None:
-        sitio.usuario_codigo = equiv.usuario_codigo
+    if equiv is None:
+        # Assigning an oid nobody maps to would make the site invisible to every coordinator and
+        # leave usuario_codigo stale, so the next bulk load could never repair it (audit DAT-4).
+        raise unprocessable("El coordinador destino no tiene una equivalencia activa")
+    sitios.cambiar_propietario(session, sitio, nuevo)
+    sitio.usuario_codigo = equiv.usuario_codigo
     sitio.en_revision_admin = False
     sitio.revision_detalle = None
     _touch(sitio)
-    for model in (SitioContacto, SitioVisita, SitioArchivo, SubidaSesion):
-        session.execute(
-            update(model).where(model.sitio_id == sitio.id).values(coordinador_oid=nuevo)
-        )
     _history(
         session,
         sitio,

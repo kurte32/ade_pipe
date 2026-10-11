@@ -2,19 +2,49 @@ from __future__ import annotations
 
 import base64
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy import func, select, text, true
+from sqlalchemy import func, select, text, true, update
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.errors import not_found, unprocessable
 from app.core.security import Claims
-from app.models import Sitio
+from app.models import (
+    NotificacionOutbox,
+    Sitio,
+    SitioArchivo,
+    SitioContacto,
+    SitioVisita,
+    SubidaSesion,
+)
 from app.modules.sitios.schemas import ArchivoOut, SitioDetail, SitioListItem, SitioPage
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 # Keep IN-list chunks well under SQL Server's 2100-parameter statement limit (audit B-03).
 _ID_CHUNK = 1000
+
+
+def cambiar_propietario(session: Session, sitio: Sitio, nuevo_oid: UUID) -> None:
+    """Move a site and everything RLS scopes by owner to another coordinator.
+
+    The owner is denormalised onto the child tables so RLS can filter them without a join; every
+    reassignment path (admin `reasignar`, bulk reload with a new USUARIO) must go through here or
+    the new coordinator sees a site without its contact, visit and files (audit DAT-1). Pending,
+    unsent notifications follow the site too: the return notice is for whoever now owns it, and
+    the previous coordinator must not receive the admin's comment about a site that is no longer
+    theirs (audit DAT-5). Already-sent rows are history and stay as they are.
+    """
+    sitio.coordinador_oid = nuevo_oid
+    for model in (SitioContacto, SitioVisita, SitioArchivo, SubidaSesion):
+        session.execute(
+            update(model).where(model.sitio_id == sitio.id).values(coordinador_oid=nuevo_oid)
+        )
+    session.execute(
+        update(NotificacionOutbox)
+        .where(NotificacionOutbox.sitio_id == sitio.id, NotificacionOutbox.estado == "pendiente")
+        .values(destinatario_oid=nuevo_oid)
+    )
 
 
 def etag_of(sitio: Sitio) -> str:

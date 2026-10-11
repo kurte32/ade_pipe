@@ -1370,12 +1370,50 @@
       }
     },
     "/api/v1/archivos/{archivo_id}": {
+      "head": {
+        "tags": [
+          "archivos"
+        ],
+        "summary": "Descargar Archivo",
+        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__head",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "archivo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Archivo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "archivos"
         ],
         "summary": "Descargar Archivo",
-        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__get",
+        "operationId": "descargar_archivo_api_v1_archivos__archivo_id__head",
         "security": [
           {
             "HTTPBearer": []
@@ -2419,7 +2457,7 @@
           "correo": {
             "type": "string",
             "maxLength": 200,
-            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "pattern": "^[^@\\s/\\\\%?#]+@[^@\\s/\\\\%?#]+\\.[^@\\s/\\\\%?#]+$",
             "title": "Correo"
           },
           "activo": {
@@ -2444,7 +2482,7 @@
           "correo": {
             "type": "string",
             "maxLength": 200,
-            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "pattern": "^[^@\\s/\\\\%?#]+@[^@\\s/\\\\%?#]+\\.[^@\\s/\\\\%?#]+$",
             "title": "Correo"
           },
           "activo": {

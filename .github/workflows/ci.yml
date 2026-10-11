@@ -97,6 +97,8 @@ jobs:
         run: |
           uv run python -m app.cli db-init
           uv run alembic upgrade head
+          # Models and schema must agree; a drift here would end up in the next autogenerate.
+          uv run alembic check
 
       - name: Unit and integration tests
         working-directory: backend

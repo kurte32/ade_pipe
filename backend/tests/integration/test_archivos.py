@@ -170,6 +170,7 @@ def test_resumable_three_part_pdf_roundtrip(
     )
     assert part.status_code == 206 and part.content == data[10:20]
     assert part.headers["content-range"] == f"bytes 10-19/{len(data)}"
+
     def descargas() -> int:
         with system_session() as s:
             return len(

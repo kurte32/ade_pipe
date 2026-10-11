@@ -100,3 +100,31 @@ def test_outbox_retries_with_backoff(
             text("SELECT intentos FROM notificacion_outbox WHERE sitio_id = :s"), {"s": sid}
         ).scalar()
     assert intentos == 1
+
+
+def test_reasignar_moves_pending_notifications(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, admin_headers, two_sites
+):
+    """DAT-5: an unsent return notice follows the site; the old coordinator must not get it."""
+    from sqlalchemy import text
+
+    from app.core.db import system_session
+
+    sid = two_sites["a"]
+    _devolver(client, coord_a_headers, admin_headers, sid)
+    etag = client.get(f"/api/v1/sitios/{sid}", headers=admin_headers).headers["etag"].strip('"')
+    r = client.post(
+        f"/api/v1/admin/sitios/{sid}/reasignar",
+        json={"coordinador_oid": str(two_sites["oid_b"])},
+        headers={**admin_headers, "If-Match": f'"{etag}"'},
+    )
+    assert r.status_code == 200, r.text
+    with system_session() as s:
+        rows = s.execute(
+            text("SELECT destinatario_oid, estado FROM notificacion_outbox WHERE sitio_id = :id"),
+            {"id": sid},
+        ).all()
+    assert rows, "the return must have queued a notification"
+    for destinatario, estado in rows:
+        if estado == "pendiente":
+            assert str(destinatario).lower() == str(two_sites["oid_b"]).lower()

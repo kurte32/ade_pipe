@@ -49,6 +49,7 @@ from app.modules.cargas.validation import (
     validate_rows,
 )
 from app.modules.equivalencias import service as equivalencias
+from app.modules.sitios import service as sitios_service
 
 log = structlog.get_logger()
 
@@ -367,7 +368,7 @@ def confirm(session: Session, claims: Claims, lote_id: uuid.UUID) -> ConfirmResu
             if reassigned and prev.estatus == ESTATUS_PROSPECTADO:
                 old = prev.usuario_codigo
                 prev.usuario_codigo = n["usuario_codigo"]
-                prev.coordinador_oid = uuid.UUID(n["coordinador_oid"])
+                sitios_service.cambiar_propietario(session, prev, uuid.UUID(n["coordinador_oid"]))
                 session.add(
                     SitioEstatusHistorial(
                         sitio_id=prev.id,

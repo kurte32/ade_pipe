@@ -310,6 +310,39 @@ def test_reasignar(client, admin_headers, coord_a_headers, coord_b_headers, two_
     assert r.status_code == 422
 
 
+def test_reasignar_to_unknown_coordinator_is_422(client, admin_headers, two_sites):  # type: ignore[no-untyped-def]
+    """DAT-4: an oid with no active equivalence would make the site invisible to everyone."""
+    sid = two_sites["a"]
+    etag = _etag(client, admin_headers, sid)
+    r = client.post(
+        f"/api/v1/admin/sitios/{sid}/reasignar",
+        json={"coordinador_oid": str(uuid.uuid4())},
+        headers={**admin_headers, "If-Match": f'"{etag}"'},
+    )
+    assert r.status_code == 422, r.text
+    d = client.get(f"/api/v1/sitios/{sid}", headers=admin_headers).json()
+    assert d["coordinador_oid"] == str(two_sites["oid_a"])
+    assert d["usuario_codigo"] == "ard"
+
+
+def test_discard_proposal_on_terminal_site_is_422(client, coord_a_headers, two_sites):  # type: ignore[no-untyped-def]
+    """DAT-6: a proposal on a discarded site would park it in admin review with no way out."""
+    sid = two_sites["a"]
+    with system_session() as s:
+        s.execute(text("UPDATE sitio SET estatus = 'descartado' WHERE id = :id"), {"id": sid})
+    etag = _etag(client, coord_a_headers, sid)
+    r = client.post(
+        f"/api/v1/sitios/{sid}/transiciones",
+        json={"estatus_destino": "descartado", "comentario": "proponer otra vez"},
+        headers={**coord_a_headers, "If-Match": f'"{etag}"'},
+    )
+    assert r.status_code == 422
+    assert (
+        client.get(f"/api/v1/sitios/{sid}", headers=coord_a_headers).json()["en_revision_admin"]
+        is False
+    )
+
+
 def test_catalogos(client, coord_a_headers):  # type: ignore[no-untyped-def]
     r = client.get("/api/v1/catalogos", headers=coord_a_headers)
     assert r.status_code == 200

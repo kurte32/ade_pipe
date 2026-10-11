@@ -16,7 +16,7 @@ import { ApiError, NetworkError, type Api } from "@pipeline/api-client";
 import { InteractionRequired, OfflineError } from "@pipeline/auth";
 
 import type { FotoLocal, Operacion, OperacionTipo, PipelineDb } from "../db/schema";
-import { getMeta, setMeta } from "../db/schema";
+import { clearLocalData, getMeta, setMeta } from "../db/schema";
 import type {
   ArchivoMeta,
   ContactoIn,
@@ -34,6 +34,22 @@ export const MAX_TRANSIENT_RETRIES = 5;
 
 export const META_MAX_ROWVERSION = "sitios.maxRowversion";
 export const META_LAST_SYNC = "sync.lastAt";
+/** oid of the account the local store belongs to; a different account must start empty (FE-1). */
+export const META_OWNER_OID = "sync.ownerOid";
+
+/**
+ * Make the local store belong to `oid`. When another account owned it (or nobody did), every
+ * cached site, queued operation, photo and cursor is dropped first: a second coordinator on the
+ * same phone must never see the first one's data, send their queued writes, or inherit their
+ * delta watermark. Returns true when the store was cleared.
+ */
+export async function ensureOwner(db: PipelineDb, oid: string): Promise<boolean> {
+  const owner = await getMeta<string>(db, META_OWNER_OID);
+  if (owner === oid) return false;
+  await clearLocalData(db);
+  await setMeta(db, META_OWNER_OID, oid);
+  return true;
+}
 /** "site:etag" -> etag produced by this device's own successful write on top of it. */
 export const META_ETAG_SUCCESSORS = "sync.etagSuccessors";
 const MAX_SUCCESSORS = 200;

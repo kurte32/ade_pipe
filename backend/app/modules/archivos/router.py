@@ -148,7 +148,9 @@ def archivo_meta(
     return service.archivo_meta(service.get_archivo(session, _uuid(archivo_id, "archivo")))
 
 
-@router.api_route("/archivos/{archivo_id}", methods=["GET", "HEAD"], response_class=StreamingResponse)
+@router.api_route(
+    "/archivos/{archivo_id}", methods=["GET", "HEAD"], response_class=StreamingResponse
+)
 def descargar_archivo(
     archivo_id: str,
     request: Request,

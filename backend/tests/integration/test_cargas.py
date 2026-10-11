@@ -264,7 +264,7 @@ def _load_base(client, admin_headers, offset: int) -> None:  # type: ignore[no-u
 
 
 def test_reload_updates_without_touching_progress(
-    client, admin_headers, seeded_equivalencias
+    client, admin_headers, coord_a_headers, coord_b_headers, seeded_equivalencias
 ) -> None:  # type: ignore[no-untyped-def]
     # Self-provisioned in its own id range, so it passes alone and in any order (audit C4).
     _load_base(client, admin_headers, RELOAD_OFFSET)
@@ -290,6 +290,13 @@ def test_reload_updates_without_touching_progress(
 
     # reload with USUARIO changed on the advanced site, and on one prospectado site
     other = next(s for s in ard_sites[1:] if s["origen_id"] != target["origen_id"])
+    # The prospectado site already has a contact captured by ard: it must follow the site (DAT-1).
+    r = client.put(
+        f"/api/v1/sitios/{other['id']}/contacto",
+        json={"nombre": "Dueño Reasignado", "telefono": "5551112233"},
+        headers=coord_a_headers,
+    )
+    assert r.status_code == 200, r.text
     data = _shifted_xlsx(
         {target["origen_id"]: "usa", other["origen_id"]: "usa"}, offset=RELOAD_OFFSET
     )
@@ -322,6 +329,17 @@ def test_reload_updates_without_touching_progress(
     pro_detail = client.get(f"/api/v1/sitios/{other['id']}", headers=admin_headers).json()
     assert pro_detail["usuario_codigo"] == "usa"  # prospectado site reassigned
     assert pro_detail["coordinador_oid"] == seeded_equivalencias["usa"]
+    # DAT-1: the new coordinator (usa) sees the contact and can save over it; ard no longer can.
+    as_usa = client.get(f"/api/v1/sitios/{other['id']}", headers=coord_b_headers)
+    assert as_usa.status_code == 200
+    assert as_usa.json()["contacto"]["nombre"] == "Dueño Reasignado"
+    r = client.put(
+        f"/api/v1/sitios/{other['id']}/contacto",
+        json={"nombre": "Dueño Reasignado", "telefono": "5559998877"},
+        headers=coord_b_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/v1/sitios/{other['id']}", headers=coord_a_headers).status_code == 404
 
 
 def test_cancel_and_list(client, admin_headers) -> None:  # type: ignore[no-untyped-def]

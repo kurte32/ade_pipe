@@ -3,8 +3,10 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useApi } from "../api";
+import { useQueryClient } from "@tanstack/react-query";
+
 import { getDb, getMeta, type OperacionTipo } from "../db/schema";
-import { META_LAST_SYNC, enqueue, syncAll, type SyncDeps, type SyncOutcome } from "./engine";
+import { META_LAST_SYNC, ensureOwner, enqueue, syncAll, type SyncDeps, type SyncOutcome } from "./engine";
 
 export interface SyncState {
   online: boolean;
@@ -36,6 +38,23 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const inFlight = useRef<Promise<SyncOutcome | null> | null>(null);
   const rerun = useRef(false);
+  // The store belongs to one account. Signing in as someone else on the same device (after a
+  // session expiry, or a shared phone) must not show the previous user's data, send their queued
+  // writes under the new identity, or inherit their delta cursor (audit FE-1; TDD §5.4).
+  const [storeReady, setStoreReady] = useState(false);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    let cancelled = false;
+    setStoreReady(false);
+    (async () => {
+      if (!account) return;
+      if (await ensureOwner(db, account.oid)) queryClient.clear();
+      if (!cancelled) setStoreReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [db, account, queryClient]);
 
   const pendingCount = useLiveQuery(
     () => db.operaciones.where("estado").anyOf(["pendiente", "enviando"]).count(),
@@ -54,7 +73,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, [db]);
 
   const syncNow = useCallback(async (): Promise<SyncOutcome | null> => {
-    if (!account) return null;
+    if (!account || !storeReady) return null;
     if (inFlight.current) {
       // Something was enqueued while a sync is running: run once more when it finishes.
       rerun.current = true;
@@ -86,7 +105,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     });
     inFlight.current = p;
     return p;
-  }, [account, deps]);
+  }, [account, deps, storeReady]);
 
   const enqueueOp = useCallback(
     async (sitioId: number, tipo: OperacionTipo, payload: unknown) => {
