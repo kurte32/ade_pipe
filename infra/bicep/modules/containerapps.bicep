@@ -17,6 +17,8 @@ param enableDefenderScanning bool = true
 @minValue(0)
 @maxValue(3)
 param trustedProxyHops int = 2
+@description('Revision that keeps 100% of traffic during this deployment. Empty on the first deployment (the new revision takes all traffic). The deploy workflow passes the revision serving now, runs the migration job, then shifts traffic explicitly (ADR-010, audit D-03).')
+param trafficRevision string = ''
 param migrationIdentityId string
 param migrationIdentityClientId string
 param acrLoginServer string
@@ -166,9 +168,9 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
       ingress: {
         external: true
         targetPort: 8000
-        traffic: [
-          { latestRevision: true, weight: 100 }
-        ]
+        traffic: empty(trafficRevision)
+          ? [{ latestRevision: true, weight: 100 }]
+          : [{ revisionName: trafficRevision, weight: 100 }]
         transport: 'auto'
         allowInsecure: false
         ipSecurityRestrictions: internalIngress ? [] : ipRestrictions
@@ -287,4 +289,5 @@ output environmentId string = managedEnv.id
 output environmentDefaultDomain string = managedEnv.properties.defaultDomain
 output apiFqdn string = api.properties.configuration.ingress.fqdn
 output apiName string = api.name
+output apiLatestRevision string = api.properties.latestRevisionName
 output migrateJobName string = 'caj-pipeline-migrate-${env}'
