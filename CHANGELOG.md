@@ -35,6 +35,7 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   range and unknown-unit `Range` headers ignored instead of 416; the pooled-connection RLS test
   asserts one connection; four Azure Monitor alert rules in Bicep; CI service images and the
   compose stack pinned to SQL Server 2022 CU27 and Azurite 3.35.0; backend coverage gate (80 %).
+- Authenticated OWASP ZAP active scan of the whole API contract: 0 failures, 0 warnings over 120 URLs.
 - `e2e/tools/net-timing.mjs`: time to the site list on emulated 4G and 3G (2.5 s / 1.7 s warm on
   slow 4G); Lighthouse on the built PWA: 92 / 100 / 100 / 82.
 - Database outages answer 503 `service-unavailable` with `Retry-After` instead of 500; browsing-
