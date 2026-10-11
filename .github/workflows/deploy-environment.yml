@@ -12,6 +12,11 @@ on:
       image_digest:
         required: true
         type: string
+      source_registry:
+        description: "Registry the digest was built into (dev). Imported into this environment's registry when different."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -41,6 +46,18 @@ jobs:
       # Order (ADR-010, audit D-03): create the new revision with 0% traffic, migrate, wait until the
       # new revision is healthy, then shift traffic. A failure before the shift leaves users on the
       # revision that was serving, with no manual rollback needed.
+      # Build once, promote (ADR-010, audit D-04): copy the exact digest into this environment's
+      # registry. az acr import preserves the digest, so test/prod run byte-identical images.
+      - name: Promote image digest into this environment's registry
+        if: ${{ inputs.source_registry != '' && inputs.source_registry != vars.ACR_NAME }}
+        run: |
+          SRC="${{ inputs.source_registry }}.azurecr.io/pipeline-api@${{ inputs.image_digest }}"
+          az acr import --name "${{ vars.ACR_NAME }}" --source "$SRC" \
+            --image "pipeline-api:${{ github.sha }}" --force
+          GOT=$(az acr repository show --name "${{ vars.ACR_NAME }}" --image "pipeline-api@${{ inputs.image_digest }}" --query digest -o tsv)
+          [ "$GOT" = "${{ inputs.image_digest }}" ] || { echo "digest mismatch after import: $GOT"; exit 1; }
+          echo "imported $SRC"
+
       - name: Revision serving traffic now
         id: current
         run: |
@@ -115,6 +132,21 @@ jobs:
         with:
           name: spa-bundles
           path: bundles
+
+      - name: Write this environment's SPA config.json
+        env:
+          TENANT: ${{ vars.VITE_TENANT_ID }}
+          API_CLIENT: ${{ vars.VITE_API_CLIENT_ID }}
+          PWA_CLIENT: ${{ vars.VITE_SPA_CLIENT_ID_PWA }}
+          ADMIN_CLIENT: ${{ vars.VITE_SPA_CLIENT_ID_ADMIN }}
+        run: |
+          for v in TENANT API_CLIENT PWA_CLIENT ADMIN_CLIENT; do
+            [ -n "${!v}" ] || { echo "missing environment variable for $v"; exit 1; }
+          done
+          jq -n --arg t "$TENANT" --arg s "$PWA_CLIENT" --arg a "$API_CLIENT" \
+            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a}' > bundles/pwa-coordinador/dist/config.json
+          jq -n --arg t "$TENANT" --arg s "$ADMIN_CLIENT" --arg a "$API_CLIENT" \
+            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a}' > bundles/web-admin/dist/config.json
 
       - name: Deploy PWA to Static Web Apps
         run: |

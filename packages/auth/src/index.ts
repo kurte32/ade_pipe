@@ -6,6 +6,7 @@ export * from "./types";
 export { DevAuthProvider } from "./dev";
 export type { DevUser } from "./dev";
 export { MsalAuthProvider } from "./msal";
+export { loadRuntimeEnv, RUNTIME_KEYS, RUNTIME_STORE_KEY } from "./runtime";
 
 export interface AuthEnv {
   VITE_AUTH_MODE?: string;

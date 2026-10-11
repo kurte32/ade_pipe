@@ -4,7 +4,9 @@ name: build-deploy
 # Required GitHub configuration per environment (dev, test, prod):
 #   secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID (OIDC federated credential)
 #   vars:    ACR_NAME, RESOURCE_GROUP, VITE_TENANT_ID, VITE_SPA_CLIENT_ID_PWA, VITE_SPA_CLIENT_ID_ADMIN,
-#            VITE_API_CLIENT_ID, PUBLIC_HOST (Front Door or SWA host used for the smoke test)
+#            VITE_API_CLIENT_ID (written to each SPA's config.json at deploy time, not compiled in),
+#            PUBLIC_HOST (Front Door or SWA host used for the smoke test)
+#   test/prod OIDC principals also need AcrPull on the dev registry to import the image digest.
 #   environments test and prod: required reviewers (release gate).
 # Rollback: the container app runs in multiple-revision mode; shift traffic back to the previous
 # revision with `az containerapp ingress traffic set` (see docs/AZURE_DEPLOYMENT.md section 9).
@@ -42,6 +44,8 @@ jobs:
     environment: dev
     outputs:
       digest: ${{ steps.digest.outputs.digest }}
+      # Registry the image was pushed to (dev); later environments import the digest from it.
+      source_registry: ${{ vars.ACR_NAME }}
     steps:
       - uses: actions/checkout@v4
 
@@ -108,13 +112,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      # Environment-neutral bundles: tenant and client ids are NOT compiled in. Each deployment
+      # writes config.json next to the bundle (audit D-04, D-13), so the same files are promoted.
       - name: Build SPA bundles
         env:
           VITE_AUTH_MODE: msal
-          VITE_TENANT_ID: ${{ vars.VITE_TENANT_ID }}
-          VITE_API_CLIENT_ID: ${{ vars.VITE_API_CLIENT_ID }}
-          VITE_SPA_CLIENT_ID_PWA: ${{ vars.VITE_SPA_CLIENT_ID_PWA }}
-          VITE_SPA_CLIENT_ID_ADMIN: ${{ vars.VITE_SPA_CLIENT_ID_ADMIN }}
         run: |
           corepack enable && corepack prepare pnpm@12.11.2 --activate
           pnpm install --frozen-lockfile
@@ -135,6 +137,7 @@ jobs:
     with:
       environment: dev
       image_digest: ${{ needs.build.outputs.digest }}
+      source_registry: ${{ needs.build.outputs.source_registry }}
     secrets: inherit
 
   # Depend only on build and guard with a status function: depending on deploy-dev caused a
@@ -148,6 +151,7 @@ jobs:
     with:
       environment: test
       image_digest: ${{ needs.build.outputs.digest }}
+      source_registry: ${{ needs.build.outputs.source_registry }}
     secrets: inherit
 
   deploy-prod:
@@ -158,4 +162,5 @@ jobs:
     with:
       environment: prod
       image_digest: ${{ needs.build.outputs.digest }}
+      source_registry: ${{ needs.build.outputs.source_registry }}
     secrets: inherit
