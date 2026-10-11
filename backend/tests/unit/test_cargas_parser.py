@@ -111,3 +111,37 @@ def test_helpers() -> None:
     assert cell_to_text("  ") is None
     assert cell_to_text(4.0) == "4"
     assert cell_to_text(True) == "1"
+
+
+def test_row_limit_stops_reading_early() -> None:
+    """The parser stops after max_rows + 1 non-empty rows instead of reading everything (B-04)."""
+    from app.modules.cargas.parser import _build_rows
+
+    pulled = 0
+
+    def rows():  # type: ignore[no-untyped-def]
+        nonlocal pulled
+        for i in range(100_000):
+            pulled += 1
+            yield [str(i), "x"]
+
+    with pytest.raises(AppError) as e:
+        _build_rows(["#", "NOMBRE"], rows(), max_rows=10)
+    assert e.value.status == 422
+    assert pulled == 11  # read one row past the limit, then stopped
+
+
+def test_oversized_xlsx_rejected(settings: Settings) -> None:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["#", "NOMBRE"])
+    for i in range(settings.load_max_rows + 50):
+        ws.append([i, f"sitio {i}"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    with pytest.raises(AppError) as e:
+        parse_upload("grande.xlsx", buf.getvalue(), settings)
+    assert e.value.status == 422
+    assert "filas" in e.value.detail
