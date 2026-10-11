@@ -61,3 +61,46 @@ def test_concurrent_update_same_rowversion_rejects_the_loser(one_site: int) -> N
     finally:
         s1.close()
         s2.close()
+
+
+def test_concurrent_same_idempotency_key_returns_stored_response(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, two_sites
+) -> None:
+    """Concurrent replays of one Idempotency-Key all succeed with one identical body (audit B-02).
+
+    Before the fix the losers raced past the lookup, hit the primary key of sitio_contacto, and
+    surfaced as an unhandled 500 even though the write had succeeded.
+    """
+    import threading
+    from collections import Counter
+
+    key = f"b02-{uuid.uuid4()}"
+    headers = {**coord_a_headers, "Idempotency-Key": key}
+    body = {"nombre": "Concurrencia B02", "telefono": "55 1234 5678", "correo": None}
+    n = 6
+    barrier = threading.Barrier(n)
+    results: list[tuple[int, dict]] = []  # type: ignore[type-arg]
+    lock = threading.Lock()
+
+    def fire() -> None:
+        barrier.wait()
+        r = client.put(f"/api/v1/sitios/{two_sites['a']}/contacto", json=body, headers=headers)
+        with lock:
+            results.append((r.status_code, r.json()))
+
+    threads = [threading.Thread(target=fire) for _ in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    codes = Counter(code for code, _ in results)
+    assert codes == {200: n}, codes
+    bodies = {json_key(b) for _, b in results}
+    assert len(bodies) == 1, "every replay must return the same stored response"
+
+
+def json_key(body: dict) -> str:  # type: ignore[type-arg]
+    import json
+
+    return json.dumps(body, sort_keys=True)

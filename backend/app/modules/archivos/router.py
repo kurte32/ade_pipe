@@ -52,16 +52,14 @@ def crear_subida(
     key: str | None = Depends(idempotency_key),
 ) -> SubidaOut:
     body_hash = idempotency.request_hash(body.model_dump(mode="json"))
-    stored = idempotency.lookup(session, claims, key, SUBIDAS_ROUTE, body_hash)
-    if stored is not None:
-        response.status_code = stored[0]
-        return SubidaOut.model_validate(stored[1])
-    subida = service.create_session(session, claims, settings, body)
-    out = service.subida_out(subida, [])
-    idempotency.store(
-        session, claims, key, SUBIDAS_ROUTE, body_hash, 201, out.model_dump(mode="json")
-    )
-    return out
+
+    def work() -> tuple[int, dict[str, object]]:
+        subida = service.create_session(session, claims, settings, body)
+        return 201, service.subida_out(subida, []).model_dump(mode="json")
+
+    code, out = idempotency.run_once(session, claims, key, SUBIDAS_ROUTE, body_hash, work)
+    response.status_code = code
+    return SubidaOut.model_validate(out)
 
 
 @router.get("/subidas/{subida_id}", response_model=SubidaOut)
