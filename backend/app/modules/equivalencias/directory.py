@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Protocol
+from urllib.parse import quote
 
 import httpx
 import structlog
@@ -51,8 +52,9 @@ class GraphDirectory:
         return str(DefaultAzureCredential().get_token("https://graph.microsoft.com/.default").token)
 
     def resolve(self, email: str) -> tuple[uuid.UUID, str] | None:
-        safe = httpx.URL(f"{self.base_url}/users/{email.strip()}").raw_path.decode()
-        url = f"{self.base_url}{safe[len(httpx.URL(self.base_url).raw_path.decode()) :]}"
+        # Encode the address as a single path segment: "/", "." runs and "%" must not let a crafted
+        # value climb out of /users/ and point the app identity at another Graph path (audit A7).
+        url = f"{self.base_url}/users/{quote(email.strip(), safe='@')}"
         r = httpx.get(
             url,
             params={"$select": "id,displayName,mail,userPrincipalName"},

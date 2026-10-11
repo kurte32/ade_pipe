@@ -34,6 +34,31 @@ export const MAX_TRANSIENT_RETRIES = 5;
 
 export const META_MAX_ROWVERSION = "sitios.maxRowversion";
 export const META_LAST_SYNC = "sync.lastAt";
+/** "site:etag" -> etag produced by this device's own successful write on top of it. */
+export const META_ETAG_SUCCESSORS = "sync.etagSuccessors";
+const MAX_SUCCESSORS = 200;
+
+/**
+ * An op is enqueued with the ETag the coordinator saw. If an earlier op of the same site was still
+ * in flight, that ETag is superseded by this device's own write, and sending it would earn a
+ * false 412 (risk R24). Follow the chain of our own successful writes to the current ETag. A
+ * change by anyone else never enters this map, so a genuinely stale ETag still gets its 412.
+ */
+async function resolveEtag(db: PipelineDb, sitioId: number, etag: string): Promise<string> {
+  const map = (await getMeta<Record<string, string>>(db, META_ETAG_SUCCESSORS)) ?? {};
+  let current = etag;
+  for (let hops = 0; hops < 50 && map[`${sitioId}:${current}`]; hops++) current = map[`${sitioId}:${current}`]!;
+  return current;
+}
+
+async function recordSuccessor(db: PipelineDb, sitioId: number, from: string, to: string): Promise<void> {
+  if (!from || !to || from === to) return;
+  const map = (await getMeta<Record<string, string>>(db, META_ETAG_SUCCESSORS)) ?? {};
+  map[`${sitioId}:${from}`] = to;
+  const keys = Object.keys(map);
+  for (const k of keys.slice(0, Math.max(0, keys.length - MAX_SUCCESSORS))) delete map[k];
+  await setMeta(db, META_ETAG_SUCCESSORS, map);
+}
 
 export interface SyncOutcome {
   sent: number;
@@ -191,6 +216,10 @@ async function uploadFoto(api: Api, op: Operacion, foto: FotoLocal): Promise<Arc
   return done.status === 200 ? (done.data as ArchivoMeta) : null;
 }
 
+function isTransient(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 429 || e.status >= 500);
+}
+
 async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promise<StepResult> {
   if (e instanceof OfflineError || e instanceof NetworkError) return { kind: "offline" };
   if (e instanceof InteractionRequired) return { kind: "login" };
@@ -212,7 +241,7 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
     // NetworkError, so treating these as terminal would wedge the whole site chain with no
     // auto-retry (audit E-1). Keep the op pending and let the next sync drain it, capping attempts
     // so a genuinely poisoned request eventually surfaces for manual resolution.
-    if (e.status === 429 || e.status >= 500) {
+    if (isTransient(e)) {
       const intentos = (op.intentos ?? 0) + 1;
       if (intentos >= MAX_TRANSIENT_RETRIES) {
         await db.operaciones.update(op.id, {
@@ -261,11 +290,12 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
     const touched = new Set<number>();
     siteLoop: for (const [sitioId, ops] of bySite) {
       if (blockedSites.has(sitioId)) continue; // chain stays halted until the user resolves it
-      let etag = ops[0]?.etagBase ?? "";
+      let etag = await resolveEtag(db, sitioId, ops[0]?.etagBase ?? "");
       for (const op of ops) {
         await db.operaciones.update(op.id, { estado: "enviando" });
         const r = await sendOne(deps, op, etag);
         if (r.kind === "ok") {
+          await recordSuccessor(db, sitioId, etag, r.etag);
           etag = r.etag || etag;
           await db.operaciones.delete(op.id);
           outcome.sent += 1;
@@ -306,7 +336,8 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
         await pullDelta(deps);
         await setMeta(db, META_LAST_SYNC, deps.now?.() ?? Date.now());
       } catch (e) {
-        if (e instanceof OfflineError || e instanceof NetworkError) outcome.offline = true;
+        // A transient server error while pulling is retried like being offline (audit E-1).
+        if (e instanceof OfflineError || e instanceof NetworkError || isTransient(e)) outcome.offline = true;
         else if (e instanceof InteractionRequired || (e instanceof ApiError && e.status === 401)) {
           outcome.needsLogin = true;
         } else throw e;

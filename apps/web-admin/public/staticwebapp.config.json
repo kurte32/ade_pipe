@@ -1,5 +1,12 @@
 {
-  "navigationFallback": { "rewrite": "/index.html", "exclude": ["/assets/*", "/*.svg", "/*.json"] },
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/assets/*",
+      "/*.svg",
+      "/*.json"
+    ]
+  },
   "globalHeaders": {
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://login.microsoftonline.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     "X-Content-Type-Options": "nosniff",
@@ -7,5 +14,17 @@
     "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
   },
-  "responseOverrides": { "404": { "rewrite": "/index.html" } }
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html"
+    }
+  },
+  "routes": [
+    {
+      "route": "/config.json",
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    }
+  ]
 }

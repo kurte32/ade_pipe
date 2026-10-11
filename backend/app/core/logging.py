@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import sys
 import uuid
 from collections.abc import MutableMapping
@@ -16,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 CORRELATION_HEADER = "X-Correlation-Id"
+_SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]")
 _correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
 
 FORBIDDEN_KEYS = {
@@ -74,13 +76,18 @@ def configure_logging(level: str = "INFO") -> None:
 
 class CorrelationMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        cid = request.headers.get(CORRELATION_HEADER) or uuid.uuid4().hex
-        cid = cid[:64]
+        # The correlation id is always generated here: it is written to the append-only audit
+        # ledger, so a client must not be able to choose it (audit A5). A client-sent value is kept
+        # only as a sanitized log field so support can still match a device's own reference.
+        cid = uuid.uuid4().hex
         token = _correlation_id.set(cid)
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(
             correlation_id=cid, route=request.url.path, method=request.method
         )
+        client_cid = _SAFE_ID.sub("", request.headers.get(CORRELATION_HEADER, ""))[:64]
+        if client_cid:
+            structlog.contextvars.bind_contextvars(client_correlation_id=client_cid)
         request.state.correlation_id = cid
         try:
             response = await call_next(request)

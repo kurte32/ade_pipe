@@ -14,7 +14,7 @@ Status: **CONFIRMED** (reproduced, command + output recorded) · **SUSPECTED** (
 Finding IDs keep their audit-stream prefix: A = identity/authz/RLS, B = business logic/data integrity,
 C = test quality, D = infra/CI-CD/docs, E = browser UX/offline reliability.
 
-> **Remediation (same session):** B-01, D-01, E-1, A1, A2, B-03, C6, C10, C11, D-02, D-05, D-08 and
+> **Remediation:** see also the 2026-10-11 section at the end and `PRODUCTION_READINESS_PLAN.md`. **First pass (same session as the audit):** B-01, D-01, E-1, A1, A2, B-03, C6, C10, C11, D-02, D-05, D-08 and
 > the doc corrections (D-10, D-11, B-07) are fixed and verified — see the status table and verification
 > protocol in `REMEDIATION_PLAN.md`. The rest are left as planned actions there.
 
@@ -219,3 +219,40 @@ C = test quality, D = infra/CI-CD/docs, E = browser UX/offline reliability.
 
 ### E-6 Shared mutable dev DB accumulates e2e test rows
 - Status: CONFIRMED (observed) · Sites named “prueba”, “Equivocado borrar”, “Sitio E2E-*” persist from prior runs. Not a product defect; see C7.
+
+---
+
+## Found during remediation (2026-10-11)
+
+### A7 Crafted equivalence emails escaped the Graph `/users/` path (Medium) — fixed
+- `GraphDirectory.resolve` built the URL through httpx path normalisation and the email pattern
+  accepted `/`, `%`, `?`, `#`: `a/../../me@x.com` became `/v1.0/me@x.com`, steering the API's managed
+  identity to another Graph path; a non-user object's id could be stored as a coordinator identity.
+  Admin-only input. Fixed by percent-encoding the segment and tightening the pattern; unit tests.
+
+### D-13 Production SPAs could never start (High, latent) — fixed
+- CI set `VITE_SPA_CLIENT_ID_PWA/_ADMIN` but the code reads `VITE_SPA_CLIENT_ID`; auth config is
+  evaluated in the browser, so the build passed and every deployed SPA would fail on load. Fixed by
+  the runtime `config.json` (D-04); verified with a production build in Chrome.
+
+### D-14 The image scan action could not be resolved (Medium, latent) — fixed
+- `aquasecurity/trivy-action@0.28.0` does not exist (tags are `v`-prefixed), so the build job would
+  have failed before scanning. Pinned to `v0.36.0` by SHA.
+
+### R24 False 412 when advancing while the previous save is in flight (High) — fixed
+- Found by the first CI e2e run. Tapping "Avanzar" before the contact PUT returned queued the
+  transition with the pre-contact ETag; sent in the next sync pass, it got a spurious 412 and the
+  coordinator saw a conflict nobody caused. The engine now follows the chain of this device's own
+  successful writes when resolving an op's base ETag; other actors' changes still produce 412.
+  Reproduced deterministically in vitest and in Playwright (delayed PUT), both fixed.
+
+### CI setup defects on first GitHub run — fixed
+- pnpm 12 ignored the build-script approval in package.json; the runner's existing Microsoft keyring
+  broke the ODBC step; shellcheck flagged unused loop variables. All fixed; CI green.
+
+## Corrections to the original findings
+- **B-08:** the "`prev is None` → 500" part does not reproduce; rows without an existing site already
+  take the insert path. Only the `assert` was a defect (fixed).
+- **E-5:** closed as not reproducible; the list and its count read the same local store.
+- **E-1 follow-up:** the "Sin conexión" banner follows `navigator.onLine` and never showed falsely;
+  a distinct "retrying" banner was added for server errors while online.

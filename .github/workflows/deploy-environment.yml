@@ -12,6 +12,11 @@ on:
       image_digest:
         required: true
         type: string
+      source_registry:
+        description: "Registry the digest was built into (dev). Imported into this environment's registry when different."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -27,38 +32,63 @@ jobs:
     env:
       ENV: ${{ inputs.environment }}
       RG: ${{ vars.RESOURCE_GROUP }}
+      # dev only: office/VPN CIDRs for the public ingress (fail-closed when unset, audit D-07)
+      DEV_ALLOWED_INGRESS_CIDRS: ${{ vars.DEV_ALLOWED_INGRESS_CIDRS }}
       IMAGE: ${{ vars.ACR_NAME }}.azurecr.io/pipeline-api@${{ inputs.image_digest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Record current revision (for rollback reference)
+      # Order (ADR-010, audit D-03): create the new revision with 0% traffic, migrate, wait until the
+      # new revision is healthy, then shift traffic. A failure before the shift leaves users on the
+      # revision that was serving, with no manual rollback needed.
+      # Build once, promote (ADR-010, audit D-04): copy the exact digest into this environment's
+      # registry. az acr import preserves the digest, so test/prod run byte-identical images.
+      - name: Promote image digest into this environment's registry
+        if: ${{ inputs.source_registry != '' && inputs.source_registry != vars.ACR_NAME }}
         run: |
-          az containerapp revision list -g "$RG" -n "ca-pipeline-api-$ENV" \
-            --query "[?properties.active].{name:name,image:properties.template.containers[0].image}" -o table || true
+          SRC="${{ inputs.source_registry }}.azurecr.io/pipeline-api@${{ inputs.image_digest }}"
+          az acr import --name "${{ vars.ACR_NAME }}" --source "$SRC" \
+            --image "pipeline-api:${{ github.sha }}" --force
+          GOT=$(az acr repository show --name "${{ vars.ACR_NAME }}" --image "pipeline-api@${{ inputs.image_digest }}" --query digest -o tsv)
+          [ "$GOT" = "${{ inputs.image_digest }}" ] || { echo "digest mismatch after import: $GOT"; exit 1; }
+          echo "imported $SRC"
+
+      - name: Revision serving traffic now
+        id: current
+        run: |
+          APP="ca-pipeline-api-$ENV"
+          CUR=$(az containerapp ingress traffic show -g "$RG" -n "$APP" \
+            --query "[?weight==\`100\`].revisionName | [0]" -o tsv 2>/dev/null || true)
+          if [ -z "$CUR" ]; then
+            # traffic follows latestRevision (first deploy happened) or the app does not exist yet
+            CUR=$(az containerapp show -g "$RG" -n "$APP" --query properties.latestReadyRevisionName -o tsv 2>/dev/null || true)
+          fi
+          echo "revision=$CUR" >> "$GITHUB_OUTPUT"
+          echo "serving now: ${CUR:-<none, first deployment>}"
 
       - name: What-if (review before apply)
         run: |
           az deployment group what-if -g "$RG" \
             --template-file infra/bicep/main.bicep \
             --parameters "infra/bicep/params/$ENV.bicepparam" \
-            --parameters apiImage="$IMAGE" \
+            --parameters apiImage="$IMAGE" trafficRevision="${{ steps.current.outputs.revision }}" \
             --result-format FullResourcePayloads --no-pretty-print -o json \
             | jq -r '.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore") | "\(.changeType) \(.resourceId)"'
 
-      - name: Deploy infrastructure and API revision
+      - name: Deploy infrastructure and new API revision (no traffic yet)
         id: deploy
         run: |
           az deployment group create -g "$RG" -n "pipeline-$ENV-${{ github.run_number }}" \
             --template-file infra/bicep/main.bicep \
             --parameters "infra/bicep/params/$ENV.bicepparam" \
-            --parameters apiImage="$IMAGE" \
+            --parameters apiImage="$IMAGE" trafficRevision="${{ steps.current.outputs.revision }}" \
             -o json > /tmp/deployment.json
           jq -r '.properties.outputs | to_entries[] | "\(.key)=\(.value.value)"' /tmp/deployment.json | tee -a "$GITHUB_OUTPUT"
 
@@ -67,7 +97,7 @@ jobs:
           JOB="${{ steps.deploy.outputs.migrateJobName }}"
           EXEC=$(az containerapp job start -g "$RG" -n "$JOB" --query name -o tsv)
           echo "execution: $EXEC"
-          for i in $(seq 1 90); do
+          for _ in $(seq 1 90); do
             STATUS=$(az containerapp job execution show -g "$RG" -n "$JOB" --job-execution-name "$EXEC" --query properties.status -o tsv)
             case "$STATUS" in
               Succeeded) echo "migration succeeded"; exit 0 ;;
@@ -77,18 +107,55 @@ jobs:
           done
           echo "migration timed out" && exit 1
 
+      - name: Wait for the new revision to be healthy
+        run: |
+          NEW="${{ steps.deploy.outputs.apiLatestRevision }}"
+          for _ in $(seq 1 60); do
+            HEALTH=$(az containerapp revision show -g "$RG" -n "ca-pipeline-api-$ENV" --revision "$NEW" --query properties.healthState -o tsv)
+            [ "$HEALTH" = "Healthy" ] && { echo "$NEW healthy"; exit 0; }
+            sleep 10
+          done
+          echo "$NEW not healthy (last: $HEALTH)"; exit 1
+
+      - name: Shift traffic to the new revision
+        id: shift
+        run: |
+          CUR="${{ steps.current.outputs.revision }}"
+          NEW="${{ steps.deploy.outputs.apiLatestRevision }}"
+          if [ -n "$CUR" ] && [ "$CUR" != "$NEW" ]; then
+            az containerapp ingress traffic set -g "$RG" -n "ca-pipeline-api-$ENV" --revision-weight "$NEW=100" -o none
+            echo "traffic: $CUR -> $NEW"
+          else
+            echo "first deployment or unchanged revision; $NEW already serves"
+          fi
+
       - name: Download SPA bundles
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: spa-bundles
           path: bundles
+
+      - name: Write this environment's SPA config.json
+        env:
+          TENANT: ${{ vars.VITE_TENANT_ID }}
+          API_CLIENT: ${{ vars.VITE_API_CLIENT_ID }}
+          PWA_CLIENT: ${{ vars.VITE_SPA_CLIENT_ID_PWA }}
+          ADMIN_CLIENT: ${{ vars.VITE_SPA_CLIENT_ID_ADMIN }}
+        run: |
+          for v in TENANT API_CLIENT PWA_CLIENT ADMIN_CLIENT; do
+            [ -n "${!v}" ] || { echo "missing environment variable for $v"; exit 1; }
+          done
+          jq -n --arg t "$TENANT" --arg s "$PWA_CLIENT" --arg a "$API_CLIENT" \
+            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a}' > bundles/pwa-coordinador/dist/config.json
+          jq -n --arg t "$TENANT" --arg s "$ADMIN_CLIENT" --arg a "$API_CLIENT" \
+            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a}' > bundles/web-admin/dist/config.json
 
       - name: Deploy PWA to Static Web Apps
         run: |
           TOKEN=$(az staticwebapp secrets list -g "$RG" -n "swa-pipeline-pwa-$ENV" --query properties.apiKey -o tsv)
           echo "::add-mask::$TOKEN"
           echo "SWA_PWA_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-      - uses: Azure/static-web-apps-deploy@v1
+      - uses: Azure/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1 # v1
         with:
           azure_static_web_apps_api_token: ${{ env.SWA_PWA_TOKEN }}
           action: upload
@@ -101,7 +168,7 @@ jobs:
           TOKEN=$(az staticwebapp secrets list -g "$RG" -n "swa-pipeline-admin-$ENV" --query properties.apiKey -o tsv)
           echo "::add-mask::$TOKEN"
           echo "SWA_ADMIN_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-      - uses: Azure/static-web-apps-deploy@v1
+      - uses: Azure/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1 # v1
         with:
           azure_static_web_apps_api_token: ${{ env.SWA_ADMIN_TOKEN }}
           action: upload
@@ -115,7 +182,7 @@ jobs:
           if [ -z "$HOST" ]; then HOST="${{ steps.deploy.outputs.frontDoorHostname }}"; fi
           if [ -z "$HOST" ]; then HOST="${{ steps.deploy.outputs.apiFqdn }}"; fi
           echo "host: $HOST"
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             CODE=$(curl -s -o /tmp/me.json -w '%{http_code}' "https://$HOST/api/v1/me" || echo 000)
             if [ "$CODE" = "401" ] && grep -q '"type"' /tmp/me.json; then
               echo "API reachable, authentication enforced (401 Problem Details)"; exit 0
@@ -135,10 +202,16 @@ jobs:
             done
           fi
 
+      - name: Roll traffic back on failure after the shift
+        if: failure() && steps.shift.outcome == 'success' && steps.current.outputs.revision != ''
+        run: |
+          PREV="${{ steps.current.outputs.revision }}"
+          az containerapp ingress traffic set -g "$RG" -n "ca-pipeline-api-$ENV" --revision-weight "$PREV=100" -o none
+          echo "traffic restored to $PREV. Migrations are expand/contract, so $PREV runs on the new schema."
+
       - name: Rollback hint on failure
         if: failure()
         run: |
-          echo "Deployment failed. Traffic shift rollback (multiple-revision mode):"
+          echo "Deployment failed. If traffic was not restored automatically:"
           echo "  az containerapp ingress traffic set -g $RG -n ca-pipeline-api-$ENV --revision-weight <previous-revision>=100"
-          echo "The previous revision is listed by 'Record current revision' above and stays active."
           echo "Database migrations are expand/contract; do not downgrade automatically."

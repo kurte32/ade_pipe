@@ -5,7 +5,8 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 CODIGO_PATTERN = r"^[a-z]{3,10}$"
-CORREO_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+# No path, query or escape characters: the address becomes a Graph URL segment (audit A7).
+CORREO_PATTERN = r"^[^@\s/\\%?#]+@[^@\s/\\%?#]+\.[^@\s/\\%?#]+$"
 
 
 class EquivalenciaIn(BaseModel):

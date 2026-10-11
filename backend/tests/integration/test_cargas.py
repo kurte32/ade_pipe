@@ -24,15 +24,21 @@ pytestmark = pytest.mark.integration
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 SAMPLE = FIXTURES / "pipeline_nacional_mx_20261009_SINTETICO.xlsx"
-OFFSET = 900_000
+OFFSET = 900_000  # test_full_load's id range: [OFFSET, OFFSET + RANGE)
+RELOAD_OFFSET = 940_000  # test_reload provisions its own base lot here (audit C4)
+RANGE = 10_000  # sample origen ids are < 10,000, so ranges never overlap
 
 
-def _shifted_xlsx(user_override: dict[int, str] | None = None) -> bytes:
+def _in_range(origen_id: int, offset: int) -> bool:
+    return offset <= origen_id < offset + RANGE
+
+
+def _shifted_xlsx(user_override: dict[int, str] | None = None, offset: int = OFFSET) -> bytes:
     wb = load_workbook(SAMPLE)
     ws = wb.worksheets[0]
     for r in ws.iter_rows(min_row=2):
         cell = r[0]
-        cell.value = int(cell.value) + OFFSET
+        cell.value = int(cell.value) + offset
         if user_override and cell.value in user_override:
             r[1].value = user_override[cell.value]
     buf = io.BytesIO()
@@ -213,13 +219,13 @@ def test_full_load_preview_decisions_confirm_and_rls(
         cursor = page["next_cursor"]
         if not cursor:
             break
-    mine = [s for s in all_items if s["origen_id"] >= OFFSET]
+    mine = [s for s in all_items if _in_range(s["origen_id"], OFFSET)]
     assert len(mine) == 86
     assert all(s["estatus"] == "sitio_prospectado" for s in mine)
     ard_items = client.get("/api/v1/sitios", headers=coord_a_headers, params={"limit": 200}).json()[
         "items"
     ]
-    ard_mine = [s for s in ard_items if s["origen_id"] >= OFFSET]
+    ard_mine = [s for s in ard_items if _in_range(s["origen_id"], OFFSET)]
     assert ard_mine and all(s["usuario_codigo"] == "ard" for s in ard_mine)
     assert len(ard_mine) == sum(1 for s in mine if s["usuario_codigo"] == "ard")
     detail = client.get(f"/api/v1/sitios/{ard_mine[0]['id']}", headers=admin_headers).json()
@@ -230,27 +236,47 @@ def test_full_load_preview_decisions_confirm_and_rls(
         n = s.execute(
             text(
                 "SELECT COUNT(*) FROM sitio_estatus_historial h JOIN sitio si ON si.id = h.sitio_id "
-                "WHERE si.origen_id >= :lo AND h.tipo = 'carga'"
+                "WHERE si.origen_id >= :lo AND si.origen_id < :hi AND h.tipo = 'carga'"
             ),
-            {"lo": OFFSET},
+            {"lo": OFFSET, "hi": OFFSET + RANGE},
         ).scalar()
     assert n == 86
+
+
+def _load_base(client, admin_headers, offset: int) -> None:  # type: ignore[no-untyped-def]
+    """Load the 87-row sample at ``offset``, excluding one suspicious row, approving the rest."""
+    r = _upload(client, admin_headers, _shifted_xlsx(offset=offset), f"carga-base-{offset}.xlsx")
+    assert r.status_code == 201, r.text
+    lote_id = r.json()["id"]
+    warnings = _rows(client, admin_headers, lote_id, "advertencia")
+    excluded = next(
+        f for f in warnings if any(m["codigo"] == "nombre_sospechoso" for m in f["motivos"])
+    )
+    r = client.post(
+        f"/api/v1/admin/cargas/{lote_id}/decisiones",
+        headers=admin_headers,
+        json=[{"num_fila": excluded["num_fila"], "decision": "excluir"}],
+    )
+    assert r.status_code == 200, r.text
+    _approve_all(client, admin_headers, lote_id)
+    r = client.post(f"/api/v1/admin/cargas/{lote_id}/confirmar", headers=admin_headers)
+    assert r.status_code == 200, r.text
 
 
 def test_reload_updates_without_touching_progress(
     client, admin_headers, seeded_equivalencias
 ) -> None:  # type: ignore[no-untyped-def]
-    # pick an 'ard' site created by the previous test and advance it manually. Page through the list
-    # so this does not depend on the fixtures landing on the first 200-row page as the DB grows
-    # (audit C6). This test still depends on test_full_load having run (its lot provides these sites,
-    # including the one excluded there that becomes a new insert on reload) — see audit C4.
+    # Self-provisioned in its own id range, so it passes alone and in any order (audit C4).
+    _load_base(client, admin_headers, RELOAD_OFFSET)
     ard_sites: list[dict] = []
     cursor: str | None = None
     while True:
         url = "/api/v1/sitios?limit=200" + (f"&cursor={cursor}" if cursor else "")
         page = client.get(url, headers=admin_headers).json()
         ard_sites.extend(
-            s for s in page["items"] if s["origen_id"] >= OFFSET and s["usuario_codigo"] == "ard"
+            s
+            for s in page["items"]
+            if _in_range(s["origen_id"], RELOAD_OFFSET) and s["usuario_codigo"] == "ard"
         )
         cursor = page.get("next_cursor")
         if not cursor:
@@ -264,7 +290,9 @@ def test_reload_updates_without_touching_progress(
 
     # reload with USUARIO changed on the advanced site, and on one prospectado site
     other = next(s for s in ard_sites[1:] if s["origen_id"] != target["origen_id"])
-    data = _shifted_xlsx({target["origen_id"]: "usa", other["origen_id"]: "usa"})
+    data = _shifted_xlsx(
+        {target["origen_id"]: "usa", other["origen_id"]: "usa"}, offset=RELOAD_OFFSET
+    )
     r = _upload(client, admin_headers, data, "carga-test-reload.xlsx")
     assert r.status_code == 201, r.text
     lote = r.json()
@@ -314,4 +342,38 @@ def test_cancel_and_list(client, admin_headers) -> None:  # type: ignore[no-unty
     assert any(x["id"] == lote["id"] for x in listed)
     assert (
         client.get(f"/api/v1/admin/cargas/{uuid.uuid4()}", headers=admin_headers).status_code == 404
+    )
+
+
+def test_confirm_rejects_unknown_planned_action(  # type: ignore[no-untyped-def]
+    client, admin_headers, seeded_equivalencias
+) -> None:
+    """A corrupted planned action fails the confirm cleanly, applying nothing (audit B-08)."""
+    wb = load_workbook(SAMPLE)
+    ws = wb.worksheets[0]
+    ws.delete_rows(5, ws.max_row)  # header + three data rows
+    for r in ws.iter_rows(min_row=2):
+        r[0].value = int(r[0].value) + 970_000
+    buf = io.BytesIO()
+    wb.save(buf)
+    r = _upload(client, admin_headers, buf.getvalue(), "carga-b08.xlsx")
+    assert r.status_code == 201, r.text
+    lote_id = r.json()["id"]
+    _approve_all(client, admin_headers, lote_id)
+    with system_session() as s:
+        s.execute(
+            text(
+                "UPDATE carga_fila_staging SET accion_prevista = 'bogus' "
+                "WHERE lote_id = :l AND num_fila = (SELECT MIN(num_fila) FROM carga_fila_staging "
+                "WHERE lote_id = :l AND resultado <> 'error')"
+            ),
+            {"l": lote_id},
+        )
+    resp = client.post(f"/api/v1/admin/cargas/{lote_id}/confirmar", headers=admin_headers)
+    assert resp.status_code == 422, resp.text
+    lote = client.get(f"/api/v1/admin/cargas/{lote_id}", headers=admin_headers).json()
+    assert lote["lote"]["estado"] == "vista_previa"  # nothing was applied
+    assert (
+        client.post(f"/api/v1/admin/cargas/{lote_id}/cancelar", headers=admin_headers).status_code
+        == 200
     )

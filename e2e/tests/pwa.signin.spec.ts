@@ -9,7 +9,7 @@ test.describe("HU-01 / HU-02: sign in and see only my sites", () => {
       if (m.type() === "error") errors.push(m.text());
     });
     await signInAs(page, PWA_URL, "ard");
-    await expect(page.getByRole("heading", { name: "Mis sitios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mis sitios", exact: true })).toBeVisible();
     await expect(page.getByTestId("sitios-list")).toBeVisible();
     expect(errors.filter((e) => !e.includes("favicon"))).toEqual([]);
   });
@@ -23,6 +23,6 @@ test.describe("HU-01 / HU-02: sign in and see only my sites", () => {
   test("session survives a reload", async ({ page }) => {
     await signInAs(page, PWA_URL, "ard");
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Mis sitios" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mis sitios", exact: true })).toBeVisible();
   });
 });

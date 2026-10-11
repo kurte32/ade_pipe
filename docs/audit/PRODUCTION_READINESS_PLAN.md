@@ -10,6 +10,24 @@ Effort is in person-days for the named role and is an estimate for planning, not
 Verification vocabulary follows the repo convention: *implemented and locally verified* ·
 *statically validated* · *validated in test Azure* · *deployed and verified*.
 
+## Progress (2026-10-11, branch `prod-readiness`)
+
+| Phase | Status |
+|---|---|
+| 0 Decisions and access | **Not started — needs people.** Business, Legal and Security decisions; subscription, Entra registrations and Teams approval requests. |
+| 1 Open code findings | **Done, verified locally.** B-02, B-04, B-05, B-06, B-08, A5/D-12, A4/A6, C4, C5, C7, C8, C9, E-2…E-4 fixed with regression tests; E-5 closed as not reproducible; new finding A7 found and fixed. |
+| 2 Deploy pipeline | **Done.** D-03, D-04, D-06, D-07, D-09 fixed; new findings D-13 and D-14 found and fixed; actionlint and the Playwright suite added to CI. **CI passes on GitHub** (all six jobs, e2e 14/14 without retries, PR #2). The deploy workflows themselves have not run (they need Azure). |
+| 3 Azure `test` | **Blocked** on a subscription, Entra registrations and explicit authorization to create Azure resources. |
+| 4 Hardening and acceptance | Not started (depends on Phase 3; pen test should be booked now). |
+| 5 Production and pilot | Not started. |
+
+Gates after Phase 1–2, from a clean `make reset`: backend 153 passed (random order), frontend unit
+28 passed, Playwright 14 passed twice with a stable database, ruff/mypy/eslint/tsc clean, Bicep 13
+modules + 3 params with the open-ingress policy, actionlint clean, pnpm audit and pip-audit clean.
+Two plan targets were not fully met: B-04 rejects a 100k-row XLSX in 4.8 s (target 2 s; the rest is
+openpyxl loading shared strings, bounded by the 10 MB cap), and the `/readyz` schema check was
+dropped because the app role is deliberately denied access to `alembic_version`.
+
 ## Critical path
 
 Three external dependencies have lead times longer than any coding task and must start on day one:

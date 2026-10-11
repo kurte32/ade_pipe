@@ -52,16 +52,14 @@ def crear_subida(
     key: str | None = Depends(idempotency_key),
 ) -> SubidaOut:
     body_hash = idempotency.request_hash(body.model_dump(mode="json"))
-    stored = idempotency.lookup(session, claims, key, SUBIDAS_ROUTE, body_hash)
-    if stored is not None:
-        response.status_code = stored[0]
-        return SubidaOut.model_validate(stored[1])
-    subida = service.create_session(session, claims, settings, body)
-    out = service.subida_out(subida, [])
-    idempotency.store(
-        session, claims, key, SUBIDAS_ROUTE, body_hash, 201, out.model_dump(mode="json")
-    )
-    return out
+
+    def work() -> tuple[int, dict[str, object]]:
+        subida = service.create_session(session, claims, settings, body)
+        return 201, service.subida_out(subida, []).model_dump(mode="json")
+
+    code, out = idempotency.run_once(session, claims, key, SUBIDAS_ROUTE, body_hash, work)
+    response.status_code = code
+    return SubidaOut.model_validate(out)
 
 
 @router.get("/subidas/{subida_id}", response_model=SubidaOut)
@@ -87,11 +85,22 @@ async def subir_parte(
     session: Session = Depends(get_session),
     store: BlobStore = Depends(blob_store),
 ) -> PartesOut:
-    data = await request.body()
     sid = _uuid(subida_id, "sesión")
+    subida = await run_in_threadpool(service.get_subida, session, sid)
+    expected = await run_in_threadpool(service.expected_part_bytes, subida, n)
+    # Never buffer more than the part can legally hold (audit B-05): reject a larger declared
+    # Content-Length before reading, and abort the stream as soon as it overruns.
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > expected:
+        raise unprocessable(f"La parte {n} debe tener {expected} bytes y declara {declared}")
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf.extend(chunk)
+        if len(buf) > expected:
+            raise unprocessable(f"La parte {n} debe tener {expected} bytes y excede ese tamaño")
+    data = bytes(buf)
 
     def _work() -> list[int]:
-        subida = service.get_subida(session, sid)
         return service.put_part(session, store, subida, n, data)
 
     return PartesOut(partes_recibidas=await run_in_threadpool(_work))

@@ -12,6 +12,7 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.db import get_engine
 from app.core.errors import register_error_handlers
+from app.core.limits import BodyLimitMiddleware
 from app.core.logging import CorrelationMiddleware, configure_logging
 from app.core.storage import get_blob_store
 from app.core.telemetry import configure_telemetry
@@ -46,6 +47,8 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json" if settings.environment != "production" else None,
     )
     app.add_middleware(CorrelationMiddleware)
+    # Added last so it runs first: oversized bodies never reach the app (audit B-05).
+    app.add_middleware(BodyLimitMiddleware, limit=settings.max_request_bytes)
     register_error_handlers(app)
     configure_telemetry(app, settings)
 
@@ -63,13 +66,15 @@ def create_app() -> FastAPI:
             checks["database"] = "ok"
         except Exception as exc:  # noqa: BLE001
             ok = False
-            checks["database"] = f"error: {type(exc).__name__}"
+            checks["database"] = "error"
+            log.warning("readiness_check_failed", check="database", error=type(exc).__name__)
         try:
             checks["storage"] = "ok" if get_blob_store().ping() else "missing containers"
             ok = ok and checks["storage"] == "ok"
         except Exception as exc:  # noqa: BLE001
             ok = False
-            checks["storage"] = f"error: {type(exc).__name__}"
+            checks["storage"] = "error"
+            log.warning("readiness_check_failed", check="storage", error=type(exc).__name__)
         checks["status"] = "ok" if ok else "degraded"
         if not ok:
             from fastapi import HTTPException

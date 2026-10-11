@@ -86,7 +86,7 @@ export function MisSitios() {
                 <div className="row">
                   <EstatusBadge estatus={s.estatus} devuelto={s.devuelto} />
                   {p?.pending ? <span className="pending">pendiente de sincronizar</span> : null}
-                  {p?.blocked ? <span className="badge badge-devuelto">bloqueado</span> : null}
+                  {p?.blocked ? <span className="badge badge-devuelto">requiere atención</span> : null}
                   {s.en_revision_admin ? <span className="muted">en revisión</span> : null}
                 </div>
               </Link>

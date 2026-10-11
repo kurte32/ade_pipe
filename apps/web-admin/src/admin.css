@@ -9,6 +9,9 @@
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
 .filters label { margin-top: 0; min-width: 160px; flex: 1; }
 .filters input, .filters select { min-height: 40px; }
+/* Checkbox filter: keep the label on one line and never let it shrink into the button (audit E-4). */
+.filters label.check { flex: 0 0 auto; min-width: 0; display: flex; align-items: center; gap: 6px; min-height: 40px; white-space: nowrap; }
+.filters label.check input { width: auto; min-height: 0; }
 .table-wrap { overflow-x: auto; }
 .nowrap { white-space: nowrap; }
 .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.78rem; margin-right: 4px; background: #eef1f5; }

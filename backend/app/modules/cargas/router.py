@@ -4,6 +4,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings, get_settings
 from app.core.errors import unprocessable
@@ -28,7 +29,10 @@ async def crear_carga(
         raise unprocessable(
             f"El archivo supera el límite de {settings.load_max_bytes // (1024 * 1024)} MB."
         )
-    lote = service.create_lote(session, claims, file.filename or "archivo", data, settings)
+    # Parsing and validation are CPU-bound; keep them off the event loop.
+    lote = await run_in_threadpool(
+        service.create_lote, session, claims, file.filename or "archivo", data, settings
+    )
     return service.to_summary(lote)
 
 

@@ -14,6 +14,8 @@ param orgPrefix string = 't3b'
 // Network posture (ADR-008). false = service firewalls and public ingress with IP restrictions (dev).
 param privateNetworking bool = true
 param deployFrontDoor bool = true
+@description('Revision that keeps traffic while a new one is created; set by the deploy workflow (audit D-03).')
+param trafficRevision string = ''
 param deployGatewaySubnet bool = true
 param allowedIngressCidrs array = []
 
@@ -189,6 +191,8 @@ module containerapps 'modules/containerapps.bicep' = {
     apiIdentityName: identity.outputs.apiIdentityName
     apiIdentityClientId: identity.outputs.apiIdentityClientId
     enableDefenderScanning: enableDefenderScanning
+    trustedProxyHops: deployFrontDoor ? 2 : 1
+    trafficRevision: trafficRevision
     migrationIdentityId: identity.outputs.migrationIdentityId
     migrationIdentityClientId: identity.outputs.migrationIdentityClientId
     acrLoginServer: acr.outputs.loginServer
@@ -245,6 +249,7 @@ output sqlServerFqdn string = sql.outputs.serverFqdn
 output apiIdentityName string = identity.outputs.apiIdentityName
 output migrationIdentityName string = identity.outputs.migrationIdentityName
 output migrateJobName string = containerapps.outputs.migrateJobName
+output apiLatestRevision string = containerapps.outputs.apiLatestRevision
 output documentsAccountName string = storage.outputs.documentsAccountName
 output stagingAccountName string = storage.outputs.stagingAccountName
 output keyVaultName string = keyvault.outputs.vaultName

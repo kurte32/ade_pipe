@@ -7,7 +7,9 @@ param env = 'dev'
 param privateNetworking = false
 param deployFrontDoor = false
 param deployGatewaySubnet = false
-param allowedIngressCidrs = ['0.0.0.0/0'] // replace with the office/VPN CIDR before deploying
+// Fail-closed (audit D-07): the office/VPN CIDRs come from DEV_ALLOWED_INGRESS_CIDRS (comma-separated)
+// at deploy time. Without it only 127.0.0.1/32 is allowed, i.e. nothing outside can reach the API.
+param allowedIngressCidrs = split(readEnvironmentVariable('DEV_ALLOWED_INGRESS_CIDRS', '127.0.0.1/32'), ',')
 
 param authTenantId = '00000000-0000-0000-0000-000000000000'
 param authAudience = '00000000-0000-0000-0000-000000000001'

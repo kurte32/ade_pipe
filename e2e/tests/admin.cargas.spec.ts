@@ -5,12 +5,12 @@ import { buildE2ECsv, signInAdmin, trackConsoleErrors } from "../helpers/admin";
 test.describe("HU-03 / HU-04: bulk load with preview, decisions and confirm", () => {
   test("upload CSV, review, approve warning, confirm, find new site", async ({ page }) => {
     const errors = trackConsoleErrors(page);
-    const base = 800000 + (Date.now() % 100000);
+    const base = 800000 + (Date.now() % 80000); // below the 890000 site pool
     const { csv, names } = buildE2ECsv(base);
 
     await signInAdmin(page);
-    await page.getByRole("link", { name: "Cargas" }).click();
-    await expect(page.getByRole("heading", { name: "Cargas" })).toBeVisible();
+    await page.getByRole("link", { name: "Cargas", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Cargas", exact: true })).toBeVisible();
 
     await page.getByTestId("carga-file").setInputFiles({
       name: `carga_e2e_${base}.csv`,

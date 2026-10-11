@@ -1,6 +1,6 @@
 import "@pipeline/ui/base.css";
 
-import { configFromEnv, createAuthProvider } from "@pipeline/auth";
+import { configFromEnv, createAuthProvider, loadRuntimeEnv } from "@pipeline/auth";
 import { AuthContextProvider } from "@pipeline/auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -9,19 +9,25 @@ import { BrowserRouter } from "react-router-dom";
 
 import { App } from "./App";
 
-const auth = createAuthProvider(configFromEnv(import.meta.env));
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000, networkMode: "online" } },
 });
 
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <AuthContextProvider provider={auth}>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <App />
-        </BrowserRouter>
-      </QueryClientProvider>
-    </AuthContextProvider>
-  </React.StrictMode>,
-);
+async function main(): Promise<void> {
+  // Tenant and client ids come from the environment's config.json at runtime (audit D-04).
+  const env = await loadRuntimeEnv(import.meta.env.BASE_URL, import.meta.env);
+  const auth = createAuthProvider(configFromEnv(env));
+  createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <AuthContextProvider provider={auth}>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
+            <App />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </AuthContextProvider>
+    </React.StrictMode>,
+  );
+}
+
+void main();

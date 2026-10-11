@@ -48,13 +48,15 @@ def _idempotent(
     status: int = 200,
 ) -> JSONResponse:
     body_hash = idempotency.request_hash(payload)
-    stored = idempotency.lookup(session, claims, key, route, body_hash)
-    if stored is not None:
-        return _with_etag(stored[1], stored[0])
-    result = work()
-    body = result.model_dump(mode="json")
-    idempotency.store(session, claims, key, route, body_hash, status, body)
-    return _with_etag(body, status)
+    code, body = idempotency.run_once(
+        session,
+        claims,
+        key,
+        route,
+        body_hash,
+        lambda: (status, work().model_dump(mode="json")),
+    )
+    return _with_etag(body, code)
 
 
 # --- coordinator ------------------------------------------------------------------------------

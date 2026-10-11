@@ -271,6 +271,9 @@ def _apply_update(s: Sitio, n: dict[str, Any], now: datetime) -> None:
     s.actualizado_utc = now
 
 
+_ACCIONES_VALIDAS = (ACCION_INSERTAR, ACCION_ACTUALIZAR, ACCION_REVISION, None)
+
+
 def confirm(session: Session, claims: Claims, lote_id: uuid.UUID) -> ConfirmResult:
     lote = get_lote(session, lote_id)
     if lote.estado == ESTADO_CONFIRMADO:
@@ -302,6 +305,14 @@ def confirm(session: Session, claims: Claims, lote_id: uuid.UUID) -> ConfirmResu
             continue
         if f.resultado == RESULT_WARNING and f.decision_admin != "aprobar":
             continue
+        # Explicit, not an assert: asserts vanish under `python -O` and an unknown planned action
+        # would otherwise fall through to the update branch (audit B-08).
+        if f.accion_prevista not in _ACCIONES_VALIDAS:
+            raise unprocessable(
+                f"La fila {f.num_fila} tiene una acción prevista desconocida; vuelve a cargar el "
+                "archivo.",
+                {"num_fila": f.num_fila},
+            )
         n = json.loads(f.datos_normalizados or "{}")
         prev = existing.get(f.origen_id) if f.origen_id is not None else None
         if f.accion_prevista == ACCION_INSERTAR or prev is None:
@@ -370,7 +381,6 @@ def confirm(session: Session, claims: Claims, lote_id: uuid.UUID) -> ConfirmResu
                     )
                 )
             updated += 1
-        assert f.accion_prevista in (ACCION_INSERTAR, ACCION_ACTUALIZAR, ACCION_REVISION, None)
 
     lote.estado = ESTADO_CONFIRMADO
     lote.confirmado_utc = now

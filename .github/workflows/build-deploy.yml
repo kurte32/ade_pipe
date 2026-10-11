@@ -4,7 +4,9 @@ name: build-deploy
 # Required GitHub configuration per environment (dev, test, prod):
 #   secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID (OIDC federated credential)
 #   vars:    ACR_NAME, RESOURCE_GROUP, VITE_TENANT_ID, VITE_SPA_CLIENT_ID_PWA, VITE_SPA_CLIENT_ID_ADMIN,
-#            VITE_API_CLIENT_ID, PUBLIC_HOST (Front Door or SWA host used for the smoke test)
+#            VITE_API_CLIENT_ID (written to each SPA's config.json at deploy time, not compiled in),
+#            PUBLIC_HOST (Front Door or SWA host used for the smoke test)
+#   test/prod OIDC principals also need AcrPull on the dev registry to import the image digest.
 #   environments test and prod: required reviewers (release gate).
 # Rollback: the container app runs in multiple-revision mode; shift traffic back to the previous
 # revision with `az containerapp ingress traffic set` (see docs/AZURE_DEPLOYMENT.md section 9).
@@ -35,18 +37,28 @@ env:
   IMAGE_NAME: pipeline-api
 
 jobs:
+  # Lint, type checks, unit and integration tests, secret scan and Bicep validation must pass
+  # before anything is built or deployed (ADR-010, audit D-06).
+  ci:
+    name: CI gate
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
   build:
     name: Build, scan and push image; build SPA bundles
+    needs: ci
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: dev
     outputs:
       digest: ${{ steps.digest.outputs.digest }}
+      # Registry the image was pushed to (dev); later environments import the digest from it.
+      source_registry: ${{ vars.ACR_NAME }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -57,12 +69,12 @@ jobs:
         if: ${{ inputs.image_digest != '' }}
         run: echo "digest=${{ inputs.image_digest }}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
         if: ${{ inputs.image_digest == '' }}
 
       - name: Build image (local, for scanning)
         if: ${{ inputs.image_digest == '' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: backend
           load: true
@@ -73,7 +85,7 @@ jobs:
 
       - name: Scan image (Trivy, fail on CRITICAL)
         if: ${{ inputs.image_digest == '' }}
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: table
@@ -88,7 +100,7 @@ jobs:
       - name: Push image to ACR
         if: ${{ inputs.image_digest == '' }}
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: backend
           push: true
@@ -105,21 +117,19 @@ jobs:
             echo "digest=${{ steps.push.outputs.digest }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
+      # Environment-neutral bundles: tenant and client ids are NOT compiled in. Each deployment
+      # writes config.json next to the bundle (audit D-04, D-13), so the same files are promoted.
       - name: Build SPA bundles
         env:
           VITE_AUTH_MODE: msal
-          VITE_TENANT_ID: ${{ vars.VITE_TENANT_ID }}
-          VITE_API_CLIENT_ID: ${{ vars.VITE_API_CLIENT_ID }}
-          VITE_SPA_CLIENT_ID_PWA: ${{ vars.VITE_SPA_CLIENT_ID_PWA }}
-          VITE_SPA_CLIENT_ID_ADMIN: ${{ vars.VITE_SPA_CLIENT_ID_ADMIN }}
         run: |
           corepack enable && corepack prepare pnpm@12.11.2 --activate
           pnpm install --frozen-lockfile
           pnpm build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: spa-bundles
           path: |
@@ -135,6 +145,7 @@ jobs:
     with:
       environment: dev
       image_digest: ${{ needs.build.outputs.digest }}
+      source_registry: ${{ needs.build.outputs.source_registry }}
     secrets: inherit
 
   # Depend only on build and guard with a status function: depending on deploy-dev caused a
@@ -148,6 +159,7 @@ jobs:
     with:
       environment: test
       image_digest: ${{ needs.build.outputs.digest }}
+      source_registry: ${{ needs.build.outputs.source_registry }}
     secrets: inherit
 
   deploy-prod:
@@ -158,4 +170,5 @@ jobs:
     with:
       environment: prod
       image_digest: ${{ needs.build.outputs.digest }}
+      source_registry: ${{ needs.build.outputs.source_registry }}
     secrets: inherit

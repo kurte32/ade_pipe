@@ -53,10 +53,14 @@ with any local substitute enabled.
 | `AZURE_CLIENT_ID` | not set | not set | user-assigned identity client id (selects the identity for `DefaultAzureCredential`) |
 | Limits (`PDF_MAX_BYTES`, `PDF_MAX_PAGES`, `UPLOAD_CHUNK_BYTES`, `PHOTO_MAX_BYTES`, `LOAD_MAX_ROWS`, `LOAD_MAX_BYTES`, `DUPLICATE_DISTANCE_METERS`, `SUSPICIOUS_NAME_WORDS`) | `.env.example` defaults | same | config.py defaults (add to `commonEnv` in `containerapps.bicep` to override) |
 | `RETENTION_YEARS` | default 5 | 5 | param `retentionYears` |
+| `MAX_REQUEST_BYTES` | 12582912 | 12582912 | settings default (12 MiB) |
+| `TRUSTED_PROXY_HOPS` | 0 (socket peer) | 0 | 2 with Front Door, 1 without (derived from param `deployFrontDoor`) |
 
-Frontend build variables (`VITE_*`) are compile-time: local `.env.development` files in each app with
-`VITE_AUTH_MODE=dev`; CI and Azure builds set `VITE_AUTH_MODE=msal` and the tenant and client ids from
-GitHub environment variables.
+Frontend configuration: locally, `.env.development` in each app sets `VITE_AUTH_MODE=dev` and the dev
+ids. CI builds one environment-neutral bundle with only `VITE_AUTH_MODE=msal`; each deployment writes
+`config.json` next to the bundle with that environment's `VITE_TENANT_ID`, `VITE_SPA_CLIENT_ID` and
+`VITE_API_CLIENT_ID` (from GitHub environment variables), read by the app at startup. The auth mode
+cannot be changed through `config.json`.
 
 ## Local substitutes and their limits
 

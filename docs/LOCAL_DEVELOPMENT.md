@@ -46,13 +46,23 @@ catalogs), then the API with hot reload and the scheduler that runs the backgrou
 | `make test` | Backend unit + integration tests against the running stack |
 | `make test-unit` | Backend unit tests only |
 | `make lint` | ruff, mypy strict, eslint, tsc |
-| `make e2e` | Playwright end-to-end tests (needs `pnpm dev` running) |
+| `make e2e` | Playwright end-to-end tests (needs `pnpm dev` running). The suite provisions its own site pool through the bulk load and removes everything with origen ids 800000-899999 before and after, so seeded data is never consumed. `E2E_SKIP_CLEANUP=1` keeps the data for debugging. |
 | `make job-promote`, `make job-outbox`, `make job-purge`, `make job-expire_uploads`, `make job-idempotency_cleanup` | Run one background job once |
 | `make openapi` | Export `docs/openapi.json`; then `pnpm gen:api` regenerates the TypeScript client types |
 | `make bicep-lint` | Static validation of the Azure templates |
 
 Frontend only: `pnpm --filter pwa-coordinador test`, `pnpm --filter web-admin build`, etc.
 Alternative without Node on the host: `make up-web` runs both Vite servers in containers.
+
+## Notes on the test setup
+
+- The backend suite runs in random order (`pytest-randomly`); a failure prints the seed, and
+  `pytest -p randomly --randomly-seed=<seed>` reproduces the order.
+- All compose ports are published on `127.0.0.1` only: the dev issuer mints tokens without
+  authentication and SQL Server accepts the `sa` login, so neither is reachable from the LAN.
+- Request bodies over `MAX_REQUEST_BYTES` (12 MiB) are rejected with 413 before the API reads them.
+- `TRUSTED_PROXY_HOPS` stays 0 locally: the audit ledger records the socket peer and ignores
+  `X-Forwarded-For`.
 
 ## Creating a migration
 

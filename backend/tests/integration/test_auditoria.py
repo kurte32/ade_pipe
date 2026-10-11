@@ -21,6 +21,7 @@ def test_auditoria_lists_actions_with_filters(client, admin_headers, coord_a_hea
         headers={**coord_a_headers, "X-Correlation-Id": "test-corr-123"},
     )
     assert r.status_code == 200
+    contacto_cid = r.headers["X-Correlation-Id"]  # server-issued; the client value is not stored
     r = client.post(
         f"/api/v1/sitios/{sid}/transiciones",
         json={"estatus_destino": "dueno_localizado"},
@@ -33,7 +34,7 @@ def test_auditoria_lists_actions_with_filters(client, admin_headers, coord_a_hea
     acciones = [i["accion"] for i in page["items"]]
     assert acciones[:2] == ["transicion", "contacto_capturado"]
     assert page["items"][0]["detalle"] == {"de": "sitio_prospectado", "a": "dueno_localizado"}
-    assert page["items"][1]["correlation_id"] == "test-corr-123"
+    assert page["items"][1]["correlation_id"] == contacto_cid
     assert page["items"][0]["usuario_oid"] == str(two_sites["oid_a"])
     # filter by accion and user
     only = client.get(
@@ -51,3 +52,39 @@ def test_auditoria_lists_actions_with_filters(client, admin_headers, coord_a_hea
     assert (
         client.get("/api/v1/admin/auditoria?cursor=abc", headers=admin_headers).status_code == 422
     )
+
+
+def test_forged_forwarding_headers_do_not_reach_the_ledger(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, two_sites
+) -> None:
+    """Client-sent X-Forwarded-For / X-Correlation-Id are not written to the audit ledger (A5)."""
+    from sqlalchemy import select
+
+    from app.core.db import system_session
+    from app.models import Auditoria
+
+    r = client.put(
+        f"/api/v1/sitios/{two_sites['a']}/contacto",
+        json={"nombre": "Forense", "telefono": "55 1234 5678", "correo": None},
+        headers={
+            **coord_a_headers,
+            "X-Forwarded-For": "203.0.113.9",
+            "X-Correlation-Id": "forged-by-client-12345",
+        },
+    )
+    assert r.status_code == 200, r.text
+    server_cid = r.headers["X-Correlation-Id"]
+    assert server_cid != "forged-by-client-12345"
+    with system_session() as s:
+        row = (
+            s.execute(
+                select(Auditoria)
+                .where(Auditoria.entidad == "sitio", Auditoria.entidad_id == str(two_sites["a"]))
+                .order_by(Auditoria.id.desc())
+            )
+            .scalars()
+            .first()
+        )
+    assert row is not None
+    assert row.ip != "203.0.113.9"
+    assert row.correlation_id == server_cid

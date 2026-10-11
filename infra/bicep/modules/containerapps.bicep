@@ -13,6 +13,12 @@ param apiIdentityName string
 param apiIdentityClientId string
 @description('When false, SCAN_MODE falls back to none so uploads are not left waiting for scan tags that are never written (audit D-08).')
 param enableDefenderScanning bool = true
+@description('Reverse proxies that append to X-Forwarded-For before the API: 1 = Container Apps ingress, 2 = Front Door + ingress. Needs confirmation in the test environment (Phase 3).')
+@minValue(0)
+@maxValue(3)
+param trustedProxyHops int = 2
+@description('Revision that keeps 100% of traffic during this deployment. Empty on the first deployment (the new revision takes all traffic). The deploy workflow passes the revision serving now, runs the migration job, then shifts traffic explicitly (ADR-010, audit D-03).')
+param trafficRevision string = ''
 param migrationIdentityId string
 param migrationIdentityClientId string
 param acrLoginServer string
@@ -77,6 +83,7 @@ var commonEnv = [
   { name: 'STORAGE_STAGING_CONTAINER', value: stagingContainer }
   { name: 'STORAGE_DOCUMENTS_CONTAINER', value: documentsContainer }
   { name: 'SCAN_MODE', value: enableDefenderScanning ? 'defender' : 'none' }
+  { name: 'TRUSTED_PROXY_HOPS', value: string(trustedProxyHops) }
   { name: 'NOTIFY_MODE', value: 'graph' }
   { name: 'DIRECTORY_MODE', value: 'graph' }
   { name: 'GRAPH_BASE_URL', value: graphBaseUrl }
@@ -161,9 +168,9 @@ resource api 'Microsoft.App/containerApps@2024-03-01' = {
       ingress: {
         external: true
         targetPort: 8000
-        traffic: [
-          { latestRevision: true, weight: 100 }
-        ]
+        traffic: empty(trafficRevision)
+          ? [{ latestRevision: true, weight: 100 }]
+          : [{ revisionName: trafficRevision, weight: 100 }]
         transport: 'auto'
         allowInsecure: false
         ipSecurityRestrictions: internalIngress ? [] : ipRestrictions
@@ -282,4 +289,5 @@ output environmentId string = managedEnv.id
 output environmentDefaultDomain string = managedEnv.properties.defaultDomain
 output apiFqdn string = api.properties.configuration.ingress.fqdn
 output apiName string = api.name
+output apiLatestRevision string = api.properties.latestRevisionName
 output migrateJobName string = 'caj-pipeline-migrate-${env}'

@@ -43,6 +43,13 @@ for f in "$HERE"/main.bicep "$HERE"/rg.bicep; do
   fi
 done
 
+# Policy: no committed parameter file may open ingress to the whole internet (audit D-07).
+if grep -nE "0\.0\.0\.0/0|'\*'" "$HERE"/params/*.bicepparam; then
+  echo "POLICY parameter files must not allow 0.0.0.0/0 or * ingress"; status=1
+else
+  echo "POLICY no open-ingress CIDR in parameter files"
+fi
+
 if [ "$status" -eq 0 ]; then
   echo "Bicep validation passed: $(ls "$HERE"/modules/*.bicep | wc -l) modules, $(ls "$HERE"/params/*.bicepparam | wc -l) parameter files"
 else

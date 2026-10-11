@@ -10,7 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import PurePosixPath
@@ -56,19 +56,32 @@ def cell_to_text(value: object) -> str | None:
     return text if text != "" else None
 
 
-def _build_rows(header: Sequence[object], raw_rows: Sequence[Sequence[object]]) -> ParsedFile:
+def _too_many_rows(max_rows: int) -> Exception:
+    return unprocessable(f"El archivo supera el límite de {max_rows} filas.")
+
+
+def _build_rows(
+    header: Sequence[object], raw_rows: Iterable[Sequence[object]], max_rows: int
+) -> ParsedFile:
+    """Convert rows lazily and stop at the first row past ``max_rows`` (audit B-04).
+
+    ``raw_rows`` is consumed as an iterator, so an oversized sheet is rejected after reading
+    ``max_rows + 1`` non-empty rows instead of after materialising the whole file.
+    """
     columns = [normalize_header(h) for h in header]
     rows: list[dict[str, str | None]] = []
     for raw in raw_rows:
         values = [cell_to_text(v) for v in raw]
         if all(v is None for v in values):
             continue
+        if len(rows) >= max_rows:
+            raise _too_many_rows(max_rows)
         values += [None] * (len(columns) - len(values))
         rows.append({c: values[i] for i, c in enumerate(columns) if c})
     return ParsedFile(columns=[c for c in columns if c], rows=rows, formato="")
 
 
-def _parse_xlsx(data: bytes) -> ParsedFile:
+def _parse_xlsx(data: bytes, max_rows: int) -> ParsedFile:
     if not data.startswith(ZIP_MAGIC):
         raise unprocessable("El archivo no es un XLSX válido (firma incorrecta).")
     from openpyxl import load_workbook
@@ -81,15 +94,14 @@ def _parse_xlsx(data: bytes) -> ParsedFile:
         ws = wb.worksheets[0]
         it = ws.iter_rows(values_only=True)
         header = list(next(it, []))
-        body = [list(r) for r in it]
+        pf = _build_rows(header, it, max_rows)
     finally:
         wb.close()
-    pf = _build_rows(header, body)
     pf.formato = "xlsx"
     return pf
 
 
-def _parse_xls(data: bytes) -> ParsedFile:
+def _parse_xls(data: bytes, max_rows: int) -> ParsedFile:
     if not data.startswith(OLE_MAGIC):
         raise unprocessable("El archivo no es un XLS válido (firma incorrecta).")
     import xlrd
@@ -110,13 +122,13 @@ def _parse_xls(data: bytes) -> ParsedFile:
         return cell.value
 
     header = [c.value for c in sh.row(0)]
-    body = [[conv(c) for c in sh.row(i)] for i in range(1, sh.nrows)]
-    pf = _build_rows(header, body)
+    body = ([conv(c) for c in sh.row(i)] for i in range(1, sh.nrows))
+    pf = _build_rows(header, body, max_rows)
     pf.formato = "xls"
     return pf
 
 
-def _parse_csv(data: bytes) -> ParsedFile:
+def _parse_csv(data: bytes, max_rows: int) -> ParsedFile:
     if data.startswith(ZIP_MAGIC) or data.startswith(OLE_MAGIC):
         raise unprocessable("El archivo CSV no es texto.")
     try:
@@ -130,8 +142,7 @@ def _parse_csv(data: bytes) -> ParsedFile:
         dialect = csv.excel
     reader = csv.reader(io.StringIO(text), dialect)
     header = next(reader, [])
-    body: list[list[object]] = [list(r) for r in reader]
-    pf = _build_rows(list(header), body)
+    pf = _build_rows(list(header), reader, max_rows)
     pf.formato = "csv"
     return pf
 
@@ -149,11 +160,7 @@ def parse_upload(filename: str, data: bytes, settings: Settings) -> ParsedFile:
             f"El archivo supera el límite de {settings.load_max_bytes // (1024 * 1024)} MB."
         )
     if ext == ".xlsx":
-        parsed = _parse_xlsx(data)
-    elif ext == ".xls":
-        parsed = _parse_xls(data)
-    else:
-        parsed = _parse_csv(data)
-    if len(parsed.rows) > settings.load_max_rows:
-        raise unprocessable(f"El archivo supera el límite de {settings.load_max_rows} filas.")
-    return parsed
+        return _parse_xlsx(data, settings.load_max_rows)
+    if ext == ".xls":
+        return _parse_xls(data, settings.load_max_rows)
+    return _parse_csv(data, settings.load_max_rows)
