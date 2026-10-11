@@ -8,7 +8,7 @@ services:
       MSSQL_PID: Developer
       MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD:?set SQL_SA_PASSWORD in .env}
     ports:
-      - "${SQL_PORT:-1433}:1433"
+      - "127.0.0.1:${SQL_PORT:-1433}:1433"
     volumes:
       - sqldata:/var/opt/mssql
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: mcr.microsoft.com/azure-storage/azurite:latest
     command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
     ports:
-      - "${AZURITE_PORT:-10000}:10000"
+      - "127.0.0.1:${AZURITE_PORT:-10000}:10000"
     volumes:
       - azuritedata:/data
     healthcheck:
@@ -38,7 +38,7 @@ services:
       DEV_TENANT_ID: ${AUTH_TENANT_ID}
       DEV_API_CLIENT_ID: ${AUTH_AUDIENCE}
     ports:
-      - "${DEV_IDP_PORT:-8001}:8001"
+      - "127.0.0.1:${DEV_IDP_PORT:-8001}:8001"
     volumes:
       - devidpkeys:/keys
     healthcheck:
@@ -60,7 +60,7 @@ services:
       DEV_IDP_URL: http://dev-idp:8001
       AUTH_JWKS_URL: http://dev-idp:8001/${AUTH_TENANT_ID}/discovery/v2.0/keys
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
       - ./samples:/app/samples:ro
@@ -108,7 +108,7 @@ services:
       VITE_API_PROXY_TARGET: http://api:8000
       VITE_DEV_IDP_PROXY_TARGET: http://dev-idp:8001
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./:/work
     depends_on:
@@ -124,7 +124,7 @@ services:
       VITE_API_PROXY_TARGET: http://api:8000
       VITE_DEV_IDP_PROXY_TARGET: http://dev-idp:8001
     ports:
-      - "5174:5174"
+      - "127.0.0.1:5174:5174"
     volumes:
       - ./:/work
     depends_on:

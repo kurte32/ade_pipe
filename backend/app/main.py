@@ -66,13 +66,15 @@ def create_app() -> FastAPI:
             checks["database"] = "ok"
         except Exception as exc:  # noqa: BLE001
             ok = False
-            checks["database"] = f"error: {type(exc).__name__}"
+            checks["database"] = "error"
+            log.warning("readiness_check_failed", check="database", error=type(exc).__name__)
         try:
             checks["storage"] = "ok" if get_blob_store().ping() else "missing containers"
             ok = ok and checks["storage"] == "ok"
         except Exception as exc:  # noqa: BLE001
             ok = False
-            checks["storage"] = f"error: {type(exc).__name__}"
+            checks["storage"] = "error"
+            log.warning("readiness_check_failed", check="storage", error=type(exc).__name__)
         checks["status"] = "ok" if ok else "degraded"
         if not ok:
             from fastapi import HTTPException
