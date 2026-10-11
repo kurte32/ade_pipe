@@ -5,7 +5,7 @@ import { buildE2ECsv, signInAdmin, trackConsoleErrors } from "../helpers/admin";
 test.describe("HU-03 / HU-04: bulk load with preview, decisions and confirm", () => {
   test("upload CSV, review, approve warning, confirm, find new site", async ({ page }) => {
     const errors = trackConsoleErrors(page);
-    const base = 800000 + (Date.now() % 100000);
+    const base = 800000 + (Date.now() % 80000); // below the 890000 site pool
     const { csv, names } = buildE2ECsv(base);
 
     await signInAdmin(page);

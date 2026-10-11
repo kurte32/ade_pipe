@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
 import { ADMIN_CLIENT_ID, ADMIN_URL, PWA_CLIENT_ID, api, mintToken, signInAs } from "./auth";
+import { inPool } from "./pool";
 
 export interface SitioLite {
   id: number;
@@ -42,7 +43,8 @@ export async function coordToken(code: string): Promise<string> {
 export async function findSitio(code: string, estatus: string): Promise<SitioLite | null> {
   const token = await coordToken(code);
   const r = await api<{ items: SitioLite[] }>("GET", `/api/v1/sitios?limit=200&estatus=${estatus}`, token);
-  const candidates = r.data.items.filter((s) => !s.devuelto);
+  // Only the per-run pool, never seeded sites (audit C7).
+  const candidates = r.data.items.filter((s) => !s.devuelto && inPool(s.origen_id));
   return candidates[0] ?? null;
 }
 

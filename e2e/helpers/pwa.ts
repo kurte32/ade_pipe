@@ -1,7 +1,9 @@
 import { ADMIN_CLIENT_ID, api, mintToken } from "./auth";
+import { inPool } from "./pool";
 
 export interface SitioLite {
   id: number;
+  origen_id: number;
   nombre: string;
   estatus: string;
   etag: string;
@@ -13,13 +15,19 @@ interface Page<T> {
   next_cursor: string | null;
 }
 
-/** Sites of a coordinator filtered by estatus, via the API (test setup). */
+/** Pool sites of a coordinator filtered by estatus, via the API (test setup). Seeded data is untouched. */
 export async function sitiosDe(userCode: string, estatus?: string, exclude: number[] = []): Promise<SitioLite[]> {
   const token = await mintToken(userCode);
-  const qs = `?limit=200${estatus ? `&estatus=${estatus}` : ""}`;
-  const r = await api<Page<SitioLite>>("GET", `/api/v1/sitios${qs}`, token);
-  if (r.status !== 200) throw new Error(`list failed ${r.status}`);
-  return r.data.items.filter((s) => !exclude.includes(s.id));
+  const out: SitioLite[] = [];
+  let cursor: string | null = null;
+  do {
+    const qs: string = `?limit=200${estatus ? `&estatus=${estatus}` : ""}${cursor ? `&cursor=${cursor}` : ""}`;
+    const r: { status: number; data: Page<SitioLite> } = await api<Page<SitioLite>>("GET", `/api/v1/sitios${qs}`, token);
+    if (r.status !== 200) throw new Error(`list failed ${r.status}`);
+    out.push(...r.data.items);
+    cursor = r.data.next_cursor;
+  } while (cursor);
+  return out.filter((s) => inPool(s.origen_id) && !exclude.includes(s.id));
 }
 
 export async function detalle(userCode: string, id: number): Promise<SitioLite & { contacto: unknown; visita: unknown; archivos: { id: string; tipo: string; tipo_documento: string | null; vigente: boolean; estado: string }[] }> {
