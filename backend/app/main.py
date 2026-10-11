@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import Depends, FastAPI
@@ -37,6 +38,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         get_blob_store().ensure_containers()
     yield
     log.info("shutdown")
+
+
+def _schema_versions() -> tuple[str | None, frozenset[str]]:
+    """Head revision of the migrations shipped with this code, and every revision in its history."""
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        here = Path(__file__).resolve().parent.parent
+        script = ScriptDirectory.from_config(Config(str(here / "alembic.ini")))
+        head = script.get_current_head()
+        history = frozenset(r.revision for r in script.walk_revisions())
+        return head, history
+    except Exception as exc:  # noqa: BLE001 - never block start-up over this
+        log.warning("schema_versions_unavailable", error=type(exc).__name__)
+        return None, frozenset()
+
+
+CODE_SCHEMA_HEAD, CODE_SCHEMA_HISTORY = _schema_versions()
 
 
 def create_app() -> FastAPI:
@@ -79,7 +99,22 @@ def create_app() -> FastAPI:
         try:
             with get_engine().connect() as conn:
                 conn.execute(text("SELECT 1"))
+                # Which schema revision this database carries versus the one this code expects
+                # (backlog D-03r). A database behind the code is a deployment that skipped the
+                # migrate job; ahead is normal during a rollout (expand-and-contract).
+                applied = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
             checks["database"] = "ok"
+            checks["schema_revision"] = applied
+            checks["schema_head"] = CODE_SCHEMA_HEAD
+            if applied != CODE_SCHEMA_HEAD:
+                checks["schema"] = (
+                    "behind" if applied in CODE_SCHEMA_HISTORY else "ahead-or-unknown"
+                )
+                if checks["schema"] == "behind":
+                    ok = False
+                    log.warning("schema_behind_code", applied=applied, head=CODE_SCHEMA_HEAD)
+            else:
+                checks["schema"] = "ok"
         except Exception as exc:  # noqa: BLE001
             ok = False
             checks["database"] = "error"

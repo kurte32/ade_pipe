@@ -184,3 +184,15 @@ def test_delta_large_known_list_does_not_exceed_param_limit(client, coord_a_head
     assert r.status_code == 200, r.text
     # every known-but-invisible id comes back as removed, chunked under the parameter limit
     assert len(r.json()["removed_ids"]) == 2500
+
+
+def test_readyz_reports_the_applied_schema_revision(client) -> None:  # type: ignore[no-untyped-def]
+    """D-03r: the app role may read alembic_version; /readyz says which revision is applied and
+    whether it matches the code's head."""
+    from app.main import CODE_SCHEMA_HEAD
+
+    r = client.get("/readyz")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["schema"] == "ok"
+    assert body["schema_revision"] == CODE_SCHEMA_HEAD == body["schema_head"]

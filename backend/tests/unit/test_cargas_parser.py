@@ -145,3 +145,29 @@ def test_oversized_xlsx_rejected(settings: Settings) -> None:
         parse_upload("grande.xlsx", buf.getvalue(), settings)
     assert e.value.status == 422
     assert "filas" in e.value.detail
+
+
+def test_oversized_xlsx_is_refused_from_the_dimension_tag(settings: Settings) -> None:
+    """B-04r: the sheet's <dimension> tag says the file is too big before any cell is parsed."""
+    import io
+    import time
+
+    from openpyxl import Workbook
+
+    from app.modules.cargas.parser import _declared_xlsx_rows, parse_upload
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["#", "NOMBRE"])
+    for i in range(settings.load_max_rows + 50):
+        ws.append([i, "x"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    data = buf.getvalue()
+    assert _declared_xlsx_rows(data) == settings.load_max_rows + 51
+    t = time.perf_counter()
+    with pytest.raises(AppError) as e:
+        parse_upload("carga.xlsx", data, settings)
+    assert e.value.status == 422
+    assert time.perf_counter() - t < 0.5
+    assert _declared_xlsx_rows(b"not a zip") is None
