@@ -36,6 +36,8 @@ export const META_MAX_ROWVERSION = "sitios.maxRowversion";
 export const META_LAST_SYNC = "sync.lastAt";
 /** oid of the account the local store belongs to; a different account must start empty (FE-1). */
 export const META_OWNER_OID = "sync.ownerOid";
+/** Count of queued changes dropped because their site was reassigned away (FE-2); shown once. */
+export const META_LOST_OPS = "sync.lostOps";
 
 /**
  * Make the local store belong to `oid`. When another account owned it (or nobody did), every
@@ -197,7 +199,7 @@ async function sendOne(deps: SyncDeps, op: Operacion, etag: string): Promise<Ste
       await db.operaciones.delete(op.id); // nothing to upload (blob gone)
       return { kind: "ok", etag };
     }
-    await uploadFoto(api, op, foto);
+    await uploadFoto(api, db, op, foto);
     await db.fotos.delete(fotoId);
     return { kind: "ok", etag };
   } catch (e) {
@@ -205,7 +207,13 @@ async function sendOne(deps: SyncDeps, op: Operacion, etag: string): Promise<Ste
   }
 }
 
-async function uploadFoto(api: Api, op: Operacion, foto: FotoLocal): Promise<ArchivoMeta | null> {
+async function uploadFoto(
+  api: Api,
+  db: PipelineDb,
+  op: Operacion,
+  foto: FotoLocal,
+  retried = false,
+): Promise<ArchivoMeta | null> {
   const created = await api.post<SubidaOut>(
     "/api/v1/subidas",
     {
@@ -218,8 +226,17 @@ async function uploadFoto(api: Api, op: Operacion, foto: FotoLocal): Promise<Arc
     },
     { idempotencyKey: op.idempotencyKey },
   );
-  const session = created.data;
+  // A replay (same Idempotency-Key after a lost response) returns the session as it was when it
+  // was created, not as it is now; trusting that body sent parts to a session that was already
+  // published, or expired, and blocked the op for good (audit FE-4). Read the live state instead.
+  const session = await api.get<SubidaOut>(`/api/v1/subidas/${created.data.id}`);
   if (session.estado === "publicada") return null;
+  if (session.estado === "expirada" || session.estado === "rechazada" || session.estado === "cancelada") {
+    if (retried) throw new Error(`La sesión de subida quedó en estado '${session.estado}'`);
+    const idempotencyKey = uuid();
+    await db.operaciones.update(op.id, { idempotencyKey });
+    return uploadFoto(api, db, { ...op, idempotencyKey }, foto, true);
+  }
   const received = new Set(session.partes_recibidas);
   for (let n = 0; n < session.partes_total; n++) {
     if (received.has(n)) continue;
@@ -365,6 +382,25 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
   }
 }
 
+/**
+ * Drop a site that is no longer ours together with everything queued for it. Leaving the ops
+ * behind made them unreachable: blocked forever, counted in "requieren atención", with no page
+ * to resolve them from (audit FE-2). What was lost is recorded in meta for the UI.
+ */
+export async function forgetSitios(db: PipelineDb, ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  await db.transaction("rw", db.sitios, db.operaciones, db.fotos, db.meta, async () => {
+    const lost = await db.operaciones.where("sitioId").anyOf(ids).count();
+    await db.sitios.bulkDelete(ids);
+    await db.operaciones.where("sitioId").anyOf(ids).delete();
+    await db.fotos.where("sitioId").anyOf(ids).delete();
+    if (lost) {
+      const prev = (await getMeta<number>(db, META_LOST_OPS)) ?? 0;
+      await setMeta(db, META_LOST_OPS, prev + lost);
+    }
+  });
+}
+
 export async function refreshSitio(deps: SyncDeps, sitioId: number): Promise<SitioDetail | null> {
   try {
     const detail = await deps.api.get<SitioDetail>(`/api/v1/sitios/${sitioId}`);
@@ -372,7 +408,7 @@ export async function refreshSitio(deps: SyncDeps, sitioId: number): Promise<Sit
     return detail;
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) {
-      await deps.db.sitios.delete(sitioId);
+      await forgetSitios(deps.db, [sitioId]);
       return null;
     }
     throw e;
@@ -393,8 +429,8 @@ export async function pullDelta(deps: SyncDeps): Promise<SitioDelta> {
     for (const item of delta.items) {
       await db.sitios.put({ id: item.id, detail: item, etag: item.etag, updatedAt: Date.now() });
     }
-    if (delta.removed_ids.length) await db.sitios.bulkDelete(delta.removed_ids);
     await db.meta.put({ key: META_MAX_ROWVERSION, value: delta.max_rowversion });
   });
+  await forgetSitios(db, delta.removed_ids);
   return delta;
 }

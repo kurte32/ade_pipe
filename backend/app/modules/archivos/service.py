@@ -292,6 +292,22 @@ def _apply_scan_result(
     return "escaneando", None
 
 
+def _lock_sitio(session: Session, sitio_id: int) -> Sitio | None:
+    """Row-lock the parent site and bump its version.
+
+    Files change what a site *is* (its eligibility to advance, what a device must refresh) but
+    live in their own table, so without this the site's rowversion never moves: other devices
+    never receive the change through the delta (audit DAT-11) and a document delete can race an
+    advance past a required document (DAT-2) or two uploads past each other (DAT-3).
+    """
+    sitio = session.execute(
+        select(Sitio).where(Sitio.id == sitio_id).with_for_update()
+    ).scalar_one_or_none()
+    if sitio is not None:
+        sitio.actualizado_utc = _now()
+    return sitio
+
+
 def _next_version(session: Session, subida: SubidaSesion) -> int:
     stmt = select(func.max(SitioArchivo.version)).where(
         SitioArchivo.sitio_id == subida.sitio_id, SitioArchivo.tipo == subida.tipo
@@ -328,6 +344,7 @@ def promote(
     # else: an earlier attempt copied the blob and removed staging but its transaction was lost;
     # finish registering the copy that already exists.
     now = _now()
+    _lock_sitio(session, subida.sitio_id)
     if subida.tipo == "documento":
         session.execute(
             update(SitioArchivo)
@@ -407,8 +424,8 @@ def record_download(
 def soft_delete(session: Session, claims: Claims, archivo: SitioArchivo) -> None:
     if not archivo.vigente:
         return
+    sitio = _lock_sitio(session, archivo.sitio_id)
     if archivo.tipo == "documento":
-        sitio = session.get(Sitio, archivo.sitio_id)
         if sitio is not None and sitio.estatus == ESTATUS_DOCUMENTOS:
             others = session.execute(
                 select(func.count())

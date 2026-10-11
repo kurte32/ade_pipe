@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { PipelineDb } from "../db/schema";
 import type { SitioDetail } from "../lib/types";
-import { META_MAX_ROWVERSION, META_OWNER_OID, ensureOwner, enqueue, pullDelta, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
+import { META_LOST_OPS, META_MAX_ROWVERSION, META_OWNER_OID, ensureOwner, enqueue, pullDelta, retryOperation, syncAll, upsertSitio, type SyncDeps } from "./engine";
 
 function detail(id: number, estatus: string, etag: string, extra: Partial<SitioDetail> = {}): SitioDetail {
   return {
@@ -316,5 +316,87 @@ describe("ensureOwner (FE-1: one store per account)", () => {
     const db = new PipelineDb(`owner-${Math.random()}`);
     expect(await ensureOwner(db, "oid-a")).toBe(true);
     expect((await db.meta.get(META_OWNER_OID))?.value).toBe("oid-a");
+  });
+});
+
+describe("sites reassigned away (FE-2)", () => {
+  it("drops queued ops and photos of a removed site and counts them as lost", async () => {
+    await enqueue(deps, 2, "contacto", { nombre: "Ana", telefono: "2281234567", correo: null, notas: null });
+    await db.fotos.put({ id: "f1", sitioId: 2, nombre: "a.jpg", blob: new Blob(["x"]), bytes: 1, sha256: "s", creadoEn: 1 } as never);
+    api.removedIds = [2];
+    await pullDelta(deps);
+    expect(await db.sitios.get(2)).toBeUndefined();
+    expect(await db.operaciones.where("sitioId").equals(2).count()).toBe(0);
+    expect(await db.fotos.where("sitioId").equals(2).count()).toBe(0);
+    expect((await db.meta.get(META_LOST_OPS))?.value).toBe(1);
+  });
+
+  it("a 404 on refresh forgets the site and its queue", async () => {
+    await enqueue(deps, 1, "contacto", { nombre: "Ana", telefono: "2281234567", correo: null, notas: null });
+    const original = api.request.bind(api);
+    api.request = async (method, path, opts) => {
+      if (method === "GET" && path === "/api/v1/sitios/1") {
+        throw new ApiError(404, { type: "x/not-found", title: "x", status: 404, detail: "" }, "404");
+      }
+      return original(method, path, opts);
+    };
+    const { refreshSitio } = await import("./engine");
+    expect(await refreshSitio(deps, 1)).toBeNull();
+    expect(await db.operaciones.count()).toBe(0);
+  });
+});
+
+describe("photo upload replay (FE-4)", () => {
+  function fakeUploadApi(liveEstado: string, created: { estado: string; partes_recibidas: number[] }) {
+    const calls: string[] = [];
+    const original = api.request.bind(api);
+    api.request = async (method, path, opts) => {
+      calls.push(`${method} ${path}`);
+      const session = { id: "s1", estado: created.estado, partes_recibidas: created.partes_recibidas, partes_total: 1, tamano_parte: 10 };
+      if (method === "POST" && path === "/api/v1/subidas") return { data: session as never, status: 201, etag: undefined, correlationId: "c", headers: new Headers() };
+      if (method === "GET" && path === "/api/v1/subidas/s1") return { data: { ...session, estado: liveEstado } as never, status: 200, etag: undefined, correlationId: "c", headers: new Headers() };
+      if (method === "PUT" && path.startsWith("/api/v1/subidas/s1/partes/")) return { data: { partes_recibidas: [0] } as never, status: 200, etag: undefined, correlationId: "c", headers: new Headers() };
+      if (method === "POST" && path === "/api/v1/subidas/s1/completar") return { data: { id: "a1", estado: "publicado" } as never, status: 200, etag: undefined, correlationId: "c", headers: new Headers() };
+      return original(method, path, opts);
+    };
+    return calls;
+  }
+
+  it("treats a replayed 'abierta' session that is already published as done", async () => {
+    await db.fotos.put({ id: "f1", sitioId: 1, nombre: "a.jpg", blob: new Blob(["0123456789"]), bytes: 10, sha256: "s", creadoEn: 1 } as never);
+    await enqueue(deps, 1, "foto", { fotoId: "f1" });
+    const calls = fakeUploadApi("publicada", { estado: "abierta", partes_recibidas: [] });
+    const out = await syncAll(deps);
+    expect(out.blocked).toBe(0);
+    expect(await db.operaciones.count()).toBe(0);
+    expect(calls.some((c) => c.startsWith("PUT /api/v1/subidas/s1/partes"))).toBe(false);
+  });
+
+  it("mints a new idempotency key when the replayed session has expired", async () => {
+    await db.fotos.put({ id: "f1", sitioId: 1, nombre: "a.jpg", blob: new Blob(["0123456789"]), bytes: 10, sha256: "s", creadoEn: 1 } as never);
+    await enqueue(deps, 1, "foto", { fotoId: "f1" });
+    const first = (await db.operaciones.toArray())[0]!.idempotencyKey;
+    let gets = 0;
+    const original = api.request.bind(api);
+    const keys: (string | undefined)[] = [];
+    api.request = async (method, path, opts) => {
+      const session = { id: "s1", estado: "abierta", partes_recibidas: [0], partes_total: 1, tamano_parte: 10 };
+      if (method === "POST" && path === "/api/v1/subidas") {
+        keys.push(opts?.idempotencyKey);
+        return { data: session as never, status: 201, etag: undefined, correlationId: "c", headers: new Headers() };
+      }
+      if (method === "GET" && path === "/api/v1/subidas/s1") {
+        gets += 1;
+        return { data: { ...session, estado: gets === 1 ? "expirada" : "abierta" } as never, status: 200, etag: undefined, correlationId: "c", headers: new Headers() };
+      }
+      if (method === "PUT" && path.startsWith("/api/v1/subidas/s1/partes/")) return { data: { partes_recibidas: [0] } as never, status: 200, etag: undefined, correlationId: "c", headers: new Headers() };
+      if (method === "POST" && path === "/api/v1/subidas/s1/completar") return { data: { id: "a1", estado: "publicado" } as never, status: 200, etag: undefined, correlationId: "c", headers: new Headers() };
+      return original(method, path, opts);
+    };
+    const out = await syncAll(deps);
+    expect(out.blocked).toBe(0);
+    expect(keys.length).toBe(2);
+    expect(keys[1]).not.toBe(first);
+    expect(await db.operaciones.count()).toBe(0);
   });
 });

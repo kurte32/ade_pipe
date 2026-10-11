@@ -94,9 +94,18 @@ class Settings(BaseSettings):
     def _strip_slash(cls, v: str) -> str:
         return v.rstrip("/")
 
+    @property
+    def deployed(self) -> bool:
+        """True outside the developer's compose stack (test/UAT and production in Azure).
+
+        `local` is the only environment that may trust any SQL certificate, expose the API docs,
+        accept the dev identity provider or run `e2e-cleanup` (audit IDN-2).
+        """
+        return self.environment != "local"
+
     @model_validator(mode="after")
-    def _production_guard(self) -> Settings:
-        if self.environment != "production":
+    def _deployment_guard(self) -> Settings:
+        if not self.deployed:
             return self
         problems: list[str] = []
         if self.auth_mode != "entra":
@@ -107,20 +116,25 @@ class Settings(BaseSettings):
         # a correct issuer string with a dev/attacker JWKS endpoint must not start (audit A1).
         if not self.auth_jwks_url.startswith("https://login.microsoftonline.com/"):
             problems.append("AUTH_JWKS_URL must be the Entra keys endpoint")
+        if set(self.auth_tenant_id) <= set("0-"):
+            problems.append("AUTH_TENANT_ID is a placeholder")
         if self.db_auth != "entra":
             problems.append("DB_AUTH must be 'entra' (managed identity)")
         if self.storage_mode != "azure":
             problems.append("STORAGE_MODE must be 'azure'")
-        if self.scan_mode != "defender":
-            problems.append("SCAN_MODE must be 'defender'")
-        if self.notify_mode != "graph":
-            problems.append("NOTIFY_MODE must be 'graph'")
-        if self.directory_mode != "graph":
-            problems.append("DIRECTORY_MODE must be 'graph'")
         if not self.allowed_azp:
             problems.append("AUTH_ALLOWED_AZP must list the SPA client ids")
+        if self.notify_mode == "graph" and not self.teams_app_id:
+            problems.append("TEAMS_APP_ID is required with NOTIFY_MODE='graph'")
+        if self.environment == "production":
+            if self.scan_mode != "defender":
+                problems.append("SCAN_MODE must be 'defender'")
+            if self.notify_mode != "graph":
+                problems.append("NOTIFY_MODE must be 'graph'")
+            if self.directory_mode != "graph":
+                problems.append("DIRECTORY_MODE must be 'graph'")
         if problems:
-            raise ValueError("Refusing to start in production: " + "; ".join(problems))
+            raise ValueError(f"Refusing to start in {self.environment}: " + "; ".join(problems))
         return self
 
 

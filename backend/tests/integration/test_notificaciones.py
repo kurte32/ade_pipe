@@ -128,3 +128,40 @@ def test_reasignar_moves_pending_notifications(  # type: ignore[no-untyped-def]
     for destinatario, estado in rows:
         if estado == "pendiente":
             assert str(destinatario).lower() == str(two_sites["oid_b"]).lower()
+
+
+def test_overlapping_outbox_runs_send_each_row_once(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, admin_headers, two_sites, monkeypatch
+):
+    """DAT-7: scheduled runs can overlap; rows are claimed so a message is never sent twice."""
+    import threading
+    import time
+
+    sid = two_sites["a"]
+    _devolver(client, coord_a_headers, admin_headers, sid)
+    sends: list[dict] = []  # type: ignore[type-arg]
+    lock = threading.Lock()
+
+    class Slow:
+        def send(self, oid: str, body: dict) -> None:  # type: ignore[type-arg]
+            time.sleep(0.8)
+            with lock:
+                sends.append(body)
+
+    monkeypatch.setattr(outbox, "get_notifier", lambda: Slow())
+    threads = [threading.Thread(target=outbox.run) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    with system_session() as s:
+        rows = (
+            s.execute(
+                text("SELECT estado FROM notificacion_outbox WHERE sitio_id = :s"), {"s": sid}
+            )
+            .scalars()
+            .all()
+        )
+    assert rows == ["enviada"]
+    # other pending rows in a shared database may be sent too; this site's must go exactly once
+    assert sum(1 for b in sends if b.get("sitio_id") == sid) == 1

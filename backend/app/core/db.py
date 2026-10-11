@@ -28,7 +28,8 @@ def _odbc_url(settings: Settings, *, admin: bool = False, database: str | None =
     db = database or settings.db_name
     driver = "ODBC Driver 18 for SQL Server"
     encrypt = "yes"
-    trust = "yes" if settings.environment != "production" else "no"
+    # Only the compose stack (self-signed SQL Server) may skip certificate validation (IDN-2).
+    trust = "no" if settings.deployed else "yes"
     query = f"driver={quote_plus(driver)}&Encrypt={encrypt}&TrustServerCertificate={trust}"
     if settings.db_auth == "entra" and not admin:
         return f"mssql+pyodbc://@{settings.db_host}:{settings.db_port}/{db}?{query}"

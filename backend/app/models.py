@@ -25,6 +25,7 @@ from sqlalchemy import (
     Unicode,
     UnicodeText,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.mssql import TIMESTAMP, UNIQUEIDENTIFIER
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -226,7 +227,18 @@ class SitioArchivo(Base):
     purga_utc: Mapped[datetime | None] = mapped_column(DateTime)
     purgado_utc: Mapped[datetime | None] = mapped_column(DateTime)
     sitio: Mapped[Sitio] = relationship(back_populates="archivos")
-    __table_args__ = (Index("ix_sitio_archivo_sitio", "sitio_id", "tipo", "vigente"),)
+    __table_args__ = (
+        Index("ix_sitio_archivo_sitio", "sitio_id", "tipo", "vigente"),
+        # One current copy per document type (audit DAT-3); promote() retires the previous copy
+        # in the same transaction, so the index only ever rejects a concurrent duplicate.
+        Index(
+            "ux_sitio_archivo_documento_vigente",
+            "sitio_id",
+            "tipo_documento",
+            unique=True,
+            mssql_where=text("vigente = 1 AND tipo = 'documento'"),
+        ),
+    )
 
 
 class SubidaSesion(Base):

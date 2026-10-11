@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { expect, test, type Page } from "@playwright/test";
 
 import { PWA_URL, signInAs } from "../helpers/auth";
@@ -163,10 +165,13 @@ test.describe("HU-06 a HU-12: flujo del coordinador", () => {
     const bytes = Buffer.from(await res.arrayBuffer());
     expect(bytes.subarray(0, 4).toString()).toBe("%PDF");
     // in-app download button works (object URL + anchor): verify it triggers a download event
-    const dl = page.waitForEvent("download", { timeout: 15_000 }).catch(() => null);
+    const dl = page.waitForEvent("download", { timeout: 15_000 });
     await page.getByTestId("descargar-uso_de_suelo").click();
-    const ev = await dl;
-    expect(ev === null || (await ev.suggestedFilename()).endsWith(".pdf")).toBe(true);
+    const ev = await dl; // a timeout here is a failure: the button must produce a download (TST-1)
+    expect(await ev.suggestedFilename()).toMatch(/\.pdf$/);
+    const saved = await ev.path();
+    expect(saved).toBeTruthy();
+    expect(readFileSync(saved!).subarray(0, 4).toString()).toBe("%PDF");
     expect(errors).toEqual([]);
   });
 });

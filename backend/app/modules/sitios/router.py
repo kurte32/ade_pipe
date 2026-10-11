@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.security import ROLE_ADMIN, ROLE_COORDINADOR, Claims, require_role
-from app.deps import get_session
+from app.deps import SitioId, get_session
 from app.modules.sitios import service
 from app.modules.sitios.schemas import SitioDelta, SitioDetail, SitioPage
 
@@ -50,7 +50,7 @@ def resumen(
 
 @router.get("/{sitio_id}", response_model=SitioDetail)
 def get_sitio(
-    sitio_id: int,
+    sitio_id: SitioId,
     response: Response,
     claims: Claims = Depends(_any_role),
     session: Session = Depends(get_session),

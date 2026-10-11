@@ -42,9 +42,9 @@ def create_app() -> FastAPI:
         title="Pipeline de Posibles Tiendas API",
         version="0.1.0",
         lifespan=lifespan,
-        docs_url="/api/docs" if settings.environment != "production" else None,
+        docs_url=None if settings.deployed else "/api/docs",
         redoc_url=None,
-        openapi_url="/api/openapi.json" if settings.environment != "production" else None,
+        openapi_url=None if settings.deployed else "/api/openapi.json",
     )
     app.add_middleware(CorrelationMiddleware)
     # Added last so it runs first: oversized bodies never reach the app (audit B-05).

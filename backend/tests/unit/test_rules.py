@@ -32,6 +32,22 @@ class Archivo:
     estado: str = "publicado"
 
 
+def test_dueno_localizado_requires_name_and_phone() -> None:
+    """TDD §7.1 minimum fields (pendiente 5: name and phone). Pinned after a mutation that
+    removed the phone check survived the suite (audit TST-5)."""
+    assert rules.to_dueno_localizado(Sitio(contacto=Contacto(telefono="   "))) == [
+        "Falta el teléfono del dueño"
+    ]
+    assert rules.to_dueno_localizado(Sitio(contacto=Contacto(nombre=""))) == [
+        "Falta el nombre del dueño"
+    ]
+    assert rules.to_dueno_localizado(Sitio(contacto=Contacto(nombre="", telefono=""))) == [
+        "Falta el nombre del dueño",
+        "Falta el teléfono del dueño",
+    ]
+    assert rules.to_dueno_localizado(Sitio(contacto=Contacto())) == []
+
+
 @dataclass
 class Sitio:
     estatus: str = ESTATUS_PROSPECTADO

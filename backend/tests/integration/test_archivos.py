@@ -361,6 +361,29 @@ def test_expire_job(client, coord_a_headers, two_sites) -> None:  # type: ignore
     assert get_blob_store().uncommitted_blocks(path) == set()
 
 
+def test_publishing_a_file_bumps_the_site_version(client, coord_a_headers, two_sites) -> None:  # type: ignore[no-untyped-def]
+    """DAT-11 / FE-5: other devices learn about new files through the delta, which keys on the
+    site's rowversion, so publishing must touch the site."""
+    sid = two_sites["a"]
+    before = client.get(f"/api/v1/sitios/{sid}", headers=coord_a_headers).json()["etag"]
+    watermark = client.get("/api/v1/sitios/delta", headers=coord_a_headers).json()["max_rowversion"]
+    data = make_pdf(1)
+    r = _start(client, coord_a_headers, sid, data)
+    s_id = r.json()["id"]
+    _send_parts(client, coord_a_headers, s_id, data, CHUNK)
+    done = client.post(f"/api/v1/subidas/{s_id}/completar", headers=coord_a_headers)
+    assert done.status_code == 200, done.text
+    after = client.get(f"/api/v1/sitios/{sid}", headers=coord_a_headers).json()["etag"]
+    assert after != before
+    delta = client.get(f"/api/v1/sitios/delta?desde={watermark}", headers=coord_a_headers).json()
+    assert sid in [i["id"] for i in delta["items"]]
+    # retiring the file bumps it again
+    aid = done.json()["id"]
+    mid = after
+    assert client.delete(f"/api/v1/archivos/{aid}", headers=coord_a_headers).status_code == 204
+    assert client.get(f"/api/v1/sitios/{sid}", headers=coord_a_headers).json()["etag"] != mid
+
+
 def test_purge_job_keeps_metadata(client, coord_a_headers, two_sites) -> None:  # type: ignore[no-untyped-def]
     from app.jobs import purge
 

@@ -247,6 +247,10 @@ def avanzar(
             "Solo se puede avanzar un estatus a la vez",
             {"estatus_actual": sitio.estatus, "estatus_siguiente": siguiente},
         )
+    # Hold the row while the requirements are evaluated so a concurrent document delete cannot
+    # slip between the check and the commit (audit DAT-2); file writes lock the same row.
+    session.execute(select(Sitio).where(Sitio.id == sitio.id).with_for_update()).scalar_one()
+    session.refresh(sitio)
     faltantes = rules.check(destino, sitio, _required_docs(session))
     if faltantes:
         raise unprocessable(

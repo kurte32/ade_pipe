@@ -19,7 +19,7 @@ from sqlalchemy import select
 from app.core.clock import to_utc_naive, utcnow
 from app.core.db import SYSTEM_OID, system_session
 from app.core.storage import BlobStore, get_blob_store
-from app.models import Auditoria, SitioArchivo
+from app.models import Auditoria, Sitio, SitioArchivo
 
 log = structlog.get_logger()
 
@@ -41,6 +41,10 @@ def _purge_one(archivo_id: uuid.UUID, store: BlobStore, now: datetime) -> str:
             return "blocked"
         archivo.estado = "purgado"
         archivo.purgado_utc = now
+        # Bump the site's version so devices refresh their file list (audit DAT-11).
+        sitio = session.get(Sitio, archivo.sitio_id)
+        if sitio is not None:
+            sitio.actualizado_utc = now
         session.add(
             Auditoria(
                 fecha_utc=now,

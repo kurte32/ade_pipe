@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import ipaddress
 from collections.abc import Generator
+from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Path, Request
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import session_for
 from app.core.security import Claims, get_claims
 from app.core.storage import BlobStore, get_blob_store
+
+# sitio.id is an INT; anything larger overflowed pyodbc into a 500 (audit API-1).
+SitioId = Annotated[int, Path(ge=1, le=2_147_483_647)]
 
 
 def get_session(claims: Claims = Depends(get_claims)) -> Generator[Session, None, None]:

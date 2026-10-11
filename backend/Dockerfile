@@ -2,6 +2,8 @@
 FROM python:3.12-slim-bookworm AS base
 
 ARG INSTALL_DEV=false
+# An image started without ENVIRONMENT fails closed: the deployment guard applies.
+ENV ENVIRONMENT=production
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
