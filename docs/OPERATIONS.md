@@ -75,6 +75,16 @@ Runs daily. Review `SELECT COUNT(*) FROM sitio_archivo WHERE estado = 'purgado' 
 ### RB-08 Restoring the database
 Azure: point-in-time restore of the Azure SQL database to a new database name, then repoint the API by updating the `DB_HOST`/`DB_NAME` container-app environment variables (they are plain env vars, not a Key Vault reference) and redeploy. Ledger tables keep their digests; external digest storage is not configured in this build, so `sys.sp_verify_database_ledger` validates only the in-database digest. Local: `make reset && make up && make db-seed`.
 
+Verify the ledger on the restored copy before repointing (rehearsed locally on 11 October 2026):
+
+```sql
+ALTER DATABASE pipeline_restored SET ALLOW_SNAPSHOT_ISOLATION ON;  -- required by the verifier; Azure SQL has it on
+EXEC sys.sp_generate_database_ledger_digest;                         -- one JSON row: database_name, block_id, hash, …
+EXEC sys.sp_verify_database_ledger N'<that JSON row>';               -- raises on failure, returns silently on success
+```
+
+`sqlcmd` wraps long rows; run the two statements from Python through `app.core.db.build_engine(settings, admin=True, database="pipeline_restored")` or from the portal's query editor. Then confirm RLS on the copy: as the app login with no session context `SELECT COUNT(*) FROM sitio` is 0, and with `sp_set_session_context` for a coordinator it returns only their sites.
+
 ### RB-09 Rolling back a release
 The container app runs in multiple-revision mode and keeps the previous revision active. A
 deployment only shifts traffic after the migration job succeeded and the new revision is healthy,
@@ -93,6 +103,7 @@ restore point. If the previous revision is gone, redeploy its image digest throu
 1. Azure SQL metrics: CPU, DTU/vCore, failed connections, deadlocks; Query Performance Insight for the top statements.
 2. The API's pool is 5 + 10 overflow per replica; `readyz` failing with `database: error` while the server is up points at the firewall (dev), the private endpoint DNS (test/prod) or the managed identity's database user (`DB_USER`, migrate job).
 3. Scale the SKU (parameter file, redeploy) or restore (RB-08). Never change the schema by hand; RLS and ledgers are migration-managed.
+4. While the database is unreachable the API answers 503 `service-unavailable` with `Retry-After: 10` and `/readyz` is 503; clients retry with backoff. It recovers on its own when the database returns (rehearsed locally: `/readyz` back to 200 within ~6 s, no restart).
 
 ### RB-12 Ingestion cost (Log Analytics daily cap)
 1. The workspace stops ingesting at the cap (`logDailyCapGb`): alerts go blind until the next day. Check `Usage` by table; the API's request log is the usual driver.

@@ -8,6 +8,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.logging import current_correlation_id
@@ -117,6 +118,34 @@ def register_error_handlers(app: FastAPI) -> None:
             "precondition-failed",
             "El registro cambió",
             "El registro fue modificado por otra operación. Recarga y vuelve a intentar.",
+        )
+
+    @app.exception_handler(OperationalError)
+    async def _db_unavailable(request: Request, exc: OperationalError) -> JSONResponse:
+        # The database could not be reached or the connection dropped (failover, outage): this is
+        # a 503 the clients retry with backoff, not an "internal error" (RB-11, backlog SIM).
+        log.warning("database_unavailable", route=request.url.path, error=type(exc).__name__)
+        return _problem(
+            request,
+            503,
+            "service-unavailable",
+            "Servicio no disponible",
+            "La base de datos no responde; reintenta en unos segundos.",
+            None,
+            {"Retry-After": "10"},
+        )
+
+    @app.exception_handler(DBAPIError)
+    async def _db_error(request: Request, exc: DBAPIError) -> JSONResponse:
+        if exc.connection_invalidated:
+            return await _db_unavailable(request, OperationalError("", None, exc.orig))  # type: ignore[arg-type]
+        log.exception("unhandled_error", route=request.url.path)
+        return _problem(
+            request,
+            500,
+            "internal",
+            "Error interno",
+            "Ocurrió un error inesperado. Reporta el correlation_id.",
         )
 
     @app.exception_handler(HTTPException)

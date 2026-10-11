@@ -35,6 +35,11 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   range and unknown-unit `Range` headers ignored instead of 416; the pooled-connection RLS test
   asserts one connection; four Azure Monitor alert rules in Bicep; CI service images and the
   compose stack pinned to SQL Server 2022 CU27 and Azurite 3.35.0; backend coverage gate (80 %).
+- Database outages answer 503 `service-unavailable` with `Retry-After` instead of 500; browsing-
+  context isolation headers (COOP, CORP, X-Frame-Options) on both Static Web Apps. Evidence runs:
+  Trivy on the production image (0 high/critical), OWASP ZAP baseline on the built PWA and the API
+  (0 failures), backup/restore drill with ledger verification and RLS on the copy, database outage
+  simulation with self-recovery, list latency p95 200 ms (`docs/RELEASE_READINESS.md` §2).
 - `make e2e-image` (also in CI): the whole Playwright suite through the production image (no
   development dependencies, non-root, pinned base digests): 18 passed. `docs/RELEASE_READINESS.md`
   states the evidence and the first-deployment checklist.

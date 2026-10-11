@@ -23,6 +23,11 @@ What remains is **execution in Azure**, which this environment cannot reach: the
 | Schema | `alembic upgrade head`, `alembic downgrade`, `alembic check` | cycle clean, no drift (also a CI step) |
 | Secrets and dependencies | gitleaks (full history), `pip-audit`, `pnpm audit` | no leaks, no known vulnerabilities |
 | Mutation probes (audit) | 10 injected faults | 10 of 10 caught after the test added for the survivor |
+| Image vulnerability scan | `trivy image --severity HIGH,CRITICAL --ignore-unfixed pipeline-api:rc` (same scanner and severity as `build-deploy`) | 0 high, 0 critical (Debian 12.15 base, 123 packages, Python packages) |
+| Dynamic security scan | OWASP ZAP baseline against the built PWA with the SWA headers and against the API | 0 failures on both; warnings reviewed: `style-src 'unsafe-inline'` is needed for inline style attributes, browsing-context isolation headers added, COEP left out on purpose (MSAL iframe), cacheability informational |
+| Restore drill (RB-08, backlog RESTORE) | `BACKUP DATABASE … COPY_ONLY`, `RESTORE … WITH MOVE` to `pipeline_drill`, `sp_generate_database_ledger_digest` + `sp_verify_database_ledger`, RLS probe as `pipeline_app` | restore 2018 pages; ledger verification OK on the live database and on the restored copy; the restored copy returns 0 rows without session context and the coordinator's 8 with it; the app login cannot update the ledger there either. Azure point-in-time restore itself still needs Azure |
+| Database outage simulation (RB-11, backlog SIM) | `docker compose stop sqlserver`, probe, `start` | `/readyz` 503 during the outage; API calls answer 503 `service-unavailable` with `Retry-After` (was 500, fixed); `/readyz` 200 about 6 s after the database returns, with no API restart |
+| Latency sanity (RNF-08 server side) | 200 × `GET /api/v1/sitios?limit=200`, 10 concurrent, dev container | p50 132 ms, p95 200 ms, max 217 ms for the 200-item page; the 4G device measurement still needs a phone |
 
 ## 3. What changed since the audit (one line each; details in `CHANGELOG.md`)
 

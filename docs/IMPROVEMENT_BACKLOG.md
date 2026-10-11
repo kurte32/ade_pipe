@@ -46,12 +46,12 @@ depends on third parties).
 | AZ-6 | Restrict the direct Static Web App hostnames to Front Door | Engineering | P1 | S | AZURE_DEPLOYMENT §6 |
 | AZ-4 | Confirm `TRUSTED_PROXY_HOPS` by comparing the ledger IP with the caller IP | Engineering | P1 | S | AZURE_DEPLOYMENT §4 |
 | OBS | App Insights wiring, dashboards; the four Bicep alert rules (`alertEmails`) forced once each and thresholds tuned | Engineering | P0 | M | OPERATIONS "Alerts to configure" |
-| RESTORE | Restore drill: PITR to a side database, repoint, ledger digest, RLS check, timed against the RTO | Engineering | P0 | M | OPERATIONS "Backup and recovery" |
-| PEN | Penetration test (book now, 2 to 4 weeks lead time) plus the RLS test report | Seguridad | P0 | XL | PRODUCTION_READINESS_PLAN Phase 4 |
+| RESTORE | Restore drill in Azure: PITR to a side database and repoint (the local rehearsal of backup, restore, ledger verification and RLS on the copy passed on 11 October; RB-08 has the procedure)timed against the RTO | Engineering | P0 | M | OPERATIONS "Backup and recovery" |
+| PEN | Penetration test (book now, 2 to 4 weeks lead time) plus the RLS test report; an OWASP ZAP baseline against the built PWA and the API found 0 failures on 11 October | Seguridad | P0 | XL | PRODUCTION_READINESS_PLAN Phase 4 |
 | 150MB | 150 MB resumable upload with a forced disconnect and a 150 MB download through Front Door on 4G | Engineering | P1 | S | DELIVERY_REPORT §6 |
-| RNF-08 | `GET /api/v1/sitios` p95 under 3 s on 4G with the full dataset; bulk preview under 30 s | Engineering | P1 | S | IMPLEMENTATION_STATUS |
-| SIM | Azure SQL failover and Graph outage simulations | Engineering | P1 | S | PRODUCTION_READINESS §8 |
-| SCANS | Dependency and image scans in CI; Defender for Cloud recommendations | Engineering | P1 | S | PRODUCTION_READINESS §8 |
+| RNF-08 | `GET /api/v1/sitios` p95 under 3 s on 4G with the full dataset (server side p95 200 ms for 200 items locally, 11 October); bulk preview under 30 s | Engineering | P1 | S | IMPLEMENTATION_STATUS |
+| SIM | Azure SQL failover and Graph outage simulations in the test environment (local SQL outage rehearsed on 11 October: 503 with Retry-After, self-recovery; Graph failure path covered by the outbox tests) | Engineering | P1 | S | PRODUCTION_READINESS §8 |
+| SCANS | Defender for Cloud recommendations once deployed (CI already runs pip-audit, pnpm audit, gitleaks and Trivy on the image; a local Trivy run of the production image found 0 high/critical on 11 October) | Engineering | P1 | S | PRODUCTION_READINESS §8 |
 | LOG-REVIEW | Manual sample of production logs for forbidden fields | Engineering | P1 | S | PRODUCTION_READINESS §8 |
 | DRIFT | Nightly `drift.yml` green against test and prod | Engineering | P1 | S | AZURE_DEPLOYMENT §8 |
 | GO-LIVE | Production from the same digest and bundles, rollback rehearsal, delete locks and break-glass, go-live checklist signed, two-week pilot in one region | Engineering + Seguridad | P0 | L | PRODUCTION_READINESS_PLAN Phase 5 |
