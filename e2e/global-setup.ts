@@ -1,8 +1,10 @@
 import { ADMIN_CLIENT_ID, API_URL, api, mintToken } from "./helpers/auth";
+import { e2eCleanup } from "./helpers/cleanup";
 import { POOL_ARD, POOL_FIRST, POOL_USA } from "./helpers/pool";
 
 /** Load a fresh pool of prospectado sites through the real bulk-load path before the suite. */
 export default async function globalSetup(): Promise<void> {
+  e2eCleanup(); // start from a known state even if a previous run was interrupted
   const header = "#,USUARIO,REGION,SITIO,COORDENADAS,GPS,POTENCIAL,CAMPOS,FECHA";
   const rows: string[] = [];
   for (let i = 0; i < POOL_ARD + POOL_USA; i++) {

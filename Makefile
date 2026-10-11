@@ -59,8 +59,7 @@ dev: ## Run both frontends on the host with hot reload (needs node 22 + pnpm)
 	pnpm dev
 
 e2e: ## Playwright end-to-end tests against the running stack (frontends must be running)
-	$(API_RUN) python -m app.cli e2e-cleanup
-	pnpm --filter e2e test; status=$$?; $(API_RUN) python -m app.cli e2e-cleanup; exit $$status
+	pnpm --filter e2e test
 
 job-%: ## Run a background job once: make job-promote | job-outbox | job-purge
 	$(API_RUN) python -m app.jobs.run $*
