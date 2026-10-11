@@ -390,3 +390,138 @@ def test_oversized_streamed_part_aborted(client, coord_a_headers, two_sites) -> 
     )
     assert resp.status_code == 422, resp.text
     assert "excede" in resp.json()["detail"]
+
+
+# --- promote job (audit B-06, C8) -----------------------------------------------------------
+
+
+def _park_in_scan(client, headers, sitio_id, data, monkeypatch):  # type: ignore[no-untyped-def]
+    """Upload fully and leave the session in 'escaneando' (Defender mode, no tag yet)."""
+    from app.modules.archivos import router as archivos_router
+    from app.modules.archivos.scan import DefenderScanner
+
+    monkeypatch.setattr(archivos_router, "get_scanner", lambda s, st: DefenderScanner(st))
+    r = _start(client, headers, sitio_id, data)
+    assert r.status_code == 201, r.text
+    sid = r.json()["id"]
+    _send_parts(client, headers, sid, data, r.json()["tamano_parte"])
+    done = client.post(f"/api/v1/subidas/{sid}/completar", headers=headers)
+    assert done.status_code == 202, done.text
+    return uuid.UUID(sid)
+
+
+def _tag(sid, value):  # type: ignore[no-untyped-def]
+    from app.modules.archivos.scan import DEFENDER_TAG
+
+    with system_session() as s:
+        path = s.get(SubidaSesion, sid).blob_staging
+    get_blob_store().set_tags("staging", path, {DEFENDER_TAG: value})
+    return path
+
+
+def _estado(sid):  # type: ignore[no-untyped-def]
+    with system_session() as s:
+        sub = s.get(SubidaSesion, sid)
+        return sub.estado, sub.archivo_id
+
+
+def test_promote_job_isolates_failures_and_scan_outcomes(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, two_sites, monkeypatch
+) -> None:
+    from app.jobs import promote as promote_job
+    from app.modules.archivos import service as archivos_service
+    from app.modules.archivos.scan import DefenderScanner
+
+    store = get_blob_store()
+    monkeypatch.setattr(promote_job, "get_scanner", lambda s, st: DefenderScanner(st))
+    ok = _park_in_scan(client, coord_a_headers, two_sites["a"], make_pdf(1), monkeypatch)
+    boom = _park_in_scan(client, coord_a_headers, two_sites["a"], make_pdf(2), monkeypatch)
+    bad = _park_in_scan(client, coord_a_headers, two_sites["a"], make_pdf(3), monkeypatch)
+    waiting = _park_in_scan(client, coord_a_headers, two_sites["a"], make_pdf(4), monkeypatch)
+    _tag(ok, "No threats found")
+    boom_path = _tag(boom, "No threats found")
+    bad_path = _tag(bad, "Malicious")
+
+    real_promote = archivos_service.promote
+
+    def flaky(session, claims, st, settings, subida):  # type: ignore[no-untyped-def]
+        if subida.id == boom:
+            raise RuntimeError("injected failure mid-batch")
+        return real_promote(session, claims, st, settings, subida)
+
+    monkeypatch.setattr(archivos_service, "promote", flaky)
+    counts = promote_job.run()
+    assert counts.get("failed") == 1 and counts.get("malicious") == 1
+
+    assert _estado(ok)[0] == "publicada"  # not rolled back by the later failure
+    assert _estado(boom)[0] == "escaneando"
+    assert store.exists("staging", boom_path)  # source kept, so the retry can still succeed
+    assert _estado(bad)[0] == "rechazada"
+    assert not store.exists("staging", bad_path)
+    assert _estado(waiting)[0] == "escaneando"  # no tag yet -> pending
+
+    monkeypatch.setattr(archivos_service, "promote", real_promote)
+    promote_job.run()
+    assert _estado(boom)[0] == "publicada"
+
+
+def test_promote_rerun_after_lost_commit_registers_existing_copy(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, two_sites, monkeypatch
+) -> None:
+    """Blob copied and staging deleted, but the DB commit was lost: the rerun must finish (B-06)."""
+    from app.jobs import promote as promote_job
+    from app.modules.archivos import service as archivos_service
+    from app.modules.archivos.scan import DefenderScanner
+
+    store = get_blob_store()
+    monkeypatch.setattr(promote_job, "get_scanner", lambda s, st: DefenderScanner(st))
+    sid = _park_in_scan(client, coord_a_headers, two_sites["a"], make_pdf(5), monkeypatch)
+    _tag(sid, "No threats found")
+    with system_session() as s:
+        sub = s.get(SubidaSesion, sid)
+        archivo_id, dst = archivos_service.document_destination(sub)
+        staging = sub.blob_staging
+    # what a previous attempt did before its transaction was lost:
+    store.copy_staging_to_documents(staging, dst)
+    store.delete("staging", staging)
+
+    promote_job.run()
+    estado, registered = _estado(sid)
+    assert estado == "publicada"
+    assert registered == archivo_id
+    assert store.exists("documents", dst)
+
+
+def test_purge_job_isolates_a_failing_file(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, two_sites, monkeypatch
+) -> None:
+    """One file failing to purge must not roll back the others (audit B-06)."""
+    from app.jobs import purge as purge_job
+
+    _, d1 = _upload(client, coord_a_headers, two_sites["a"], make_pdf(1))
+    _, d2 = _upload(
+        client, coord_a_headers, two_sites["a"], make_pdf(2), tipo_documento="escritura_hipoteca"
+    )
+    a1, a2 = d1.json()["id"], d2.json()["id"]
+    with system_session() as s:
+        s.execute(
+            text("UPDATE sitio_archivo SET purga_utc = :t WHERE id IN (:a, :b)"),
+            {"t": to_utc_naive(utcnow()) - timedelta(days=1), "a": a1, "b": a2},
+        )
+        failing_path = s.get(SitioArchivo, uuid.UUID(a1)).ruta_blob
+
+    real = get_blob_store()
+
+    class FailingStore:
+        def delete(self, which, path):  # type: ignore[no-untyped-def]
+            if path == failing_path:
+                raise RuntimeError("injected storage failure")
+            real.delete(which, path)
+
+    monkeypatch.setattr(purge_job, "get_blob_store", lambda: FailingStore())
+    counts = purge_job.run()
+    assert counts.get("failed", 0) >= 1
+    with system_session() as s:
+        assert s.get(SitioArchivo, uuid.UUID(a1)).estado == "publicado"
+        assert s.get(SitioArchivo, uuid.UUID(a2)).estado == "purgado"
+    assert real.exists("documents", failing_path)

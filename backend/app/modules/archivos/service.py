@@ -38,6 +38,7 @@ ESTADO_RECHAZADA = "rechazada"
 ESTADO_EXPIRADA = "expirada"
 ESTADO_CANCELADA = "cancelada"
 
+_ARCHIVO_NS = uuid.UUID("6f1c2a52-3b7e-4c1d-9a0e-5d8b7f4e2c11")
 SYSTEM_OID = uuid.UUID("00000000-0000-0000-0000-000000000000")
 SYSTEM_CLAIMS = Claims(
     oid=SYSTEM_OID, name="sistema", username="sistema", roles=("Sistema",), azp="", tid=""
@@ -301,6 +302,17 @@ def _next_version(session: Session, subida: SubidaSesion) -> int:
     return int(current or 0) + 1
 
 
+def document_destination(subida: SubidaSesion) -> tuple[uuid.UUID, str]:
+    """Archivo id and documents path for a session, deterministic so reruns are idempotent (B-06).
+
+    A rerun after a lost commit targets the same blob instead of orphaning the first copy.
+    """
+    archivo_id = uuid.uuid5(_ARCHIVO_NS, str(subida.id))
+    sha = subida.sha256_real or subida.sha256_esperado
+    ext = v.extension_for(subida.content_type)
+    return archivo_id, v.document_path(subida.sitio_id, subida.tipo, archivo_id, sha, ext)
+
+
 def promote(
     session: Session, claims: Claims, store: BlobStore, settings: Settings, subida: SubidaSesion
 ) -> SitioArchivo:
@@ -308,10 +320,13 @@ def promote(
     if subida.estado == ESTADO_PUBLICADA and subida.archivo_id:
         return get_archivo(session, subida.archivo_id)
     sha = subida.sha256_real or subida.sha256_esperado
-    archivo_id = uuid.uuid4()
-    ext = v.extension_for(subida.content_type)
-    dst = v.document_path(subida.sitio_id, subida.tipo, archivo_id, sha, ext)
-    store.copy_staging_to_documents(subida.blob_staging, dst)
+    archivo_id, dst = document_destination(subida)
+    if store.exists("staging", subida.blob_staging):
+        store.copy_staging_to_documents(subida.blob_staging, dst)
+    elif not store.exists("documents", dst):
+        raise unprocessable("El archivo temporal ya no existe; vuelve a subirlo.")
+    # else: an earlier attempt copied the blob and removed staging but its transaction was lost;
+    # finish registering the copy that already exists.
     now = _now()
     if subida.tipo == "documento":
         session.execute(
