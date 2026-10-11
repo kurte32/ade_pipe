@@ -9,8 +9,8 @@ test.describe("HU-03 / HU-04: bulk load with preview, decisions and confirm", ()
     const { csv, names } = buildE2ECsv(base);
 
     await signInAdmin(page);
-    await page.getByRole("link", { name: "Cargas" }).click();
-    await expect(page.getByRole("heading", { name: "Cargas" })).toBeVisible();
+    await page.getByRole("link", { name: "Cargas", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Cargas", exact: true })).toBeVisible();
 
     await page.getByTestId("carga-file").setInputFiles({
       name: `carga_e2e_${base}.csv`,

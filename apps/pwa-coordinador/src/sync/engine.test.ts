@@ -146,6 +146,35 @@ describe("sync engine", () => {
     expect((await db.sitios.get(1))?.detail.estatus).toBe("dueno_localizado");
   });
 
+  it("advance queued while the contact is in flight uses the contact's new ETag (no false 412)", async () => {
+    // The coordinator saves the contact and taps "advance" before the contact PUT has returned:
+    // the transition is enqueued with the pre-contact ETag and is sent in the next pass.
+    await enqueue(deps, 1, "contacto", { nombre: "Ana", telefono: "2281234567", correo: null, notas: null });
+    const original = api.request.bind(api);
+    let enqueuedDuringFlight = false;
+    api.request = async <T,>(method: string, path: string, opts?: RequestOptions) => {
+      if (!enqueuedDuringFlight && path.endsWith("/contacto")) {
+        enqueuedDuringFlight = true;
+        await enqueue(deps, 1, "transicion", { estatus_destino: "dueno_localizado", comentario: null });
+      }
+      return original<T>(method, path, opts);
+    };
+    const first = await syncAll(deps);
+    expect(first.sent).toBe(1); // only the contact was pending when this pass started
+    const second = await syncAll(deps);
+    expect(second.blocked).toBe(0);
+    expect(second.sent).toBe(1);
+    expect(await db.operaciones.count()).toBe(0);
+    expect((await db.sitios.get(1))?.detail.estatus).toBe("dueno_localizado");
+  });
+
+  it("an admin change between passes still blocks with 412 (successor map only covers own writes)", async () => {
+    await enqueue(deps, 1, "transicion", { estatus_destino: "dueno_localizado", comentario: null });
+    api.etags.set(1, 5); // someone else moved the server ahead; our base e1-0 is genuinely stale
+    const out = await syncAll(deps);
+    expect(out.blocked).toBe(1);
+  });
+
   it("keeps a transient 5xx retryable and drains it on the next sync (E-1)", async () => {
     await enqueue(deps, 1, "transicion", { estatus_destino: "dueno_localizado", comentario: null });
     api.failTransitionOnce = {

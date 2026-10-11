@@ -31,6 +31,12 @@ test.describe("HU-06 a HU-12: flujo del coordinador", () => {
   test("captura contacto y medidas, avanza dos estatus en línea", async ({ page }) => {
     const errors = trackErrors(page);
     const id = await pickProspectado();
+    // Slow the contact PUT so "Avanzar" is tapped while it is still in flight: the advance must
+    // still apply, not end in a false 412 (risk R24; first seen on the slower CI runner).
+    await page.route("**/api/v1/sitios/*/contacto", async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.continue();
+    });
     await signInAs(page, PWA_URL, "ard");
     await openSitio(page, id);
     await expect(page.getByText("Sitio Prospectado", { exact: false }).first()).toBeVisible();
