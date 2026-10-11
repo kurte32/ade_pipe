@@ -35,6 +35,9 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   range and unknown-unit `Range` headers ignored instead of 416; the pooled-connection RLS test
   asserts one connection; four Azure Monitor alert rules in Bicep; CI service images and the
   compose stack pinned to SQL Server 2022 CU27 and Azurite 3.35.0; backend coverage gate (80 %).
+- `make e2e-image` (also in CI): the whole Playwright suite through the production image (no
+  development dependencies, non-root, pinned base digests): 18 passed. `docs/RELEASE_READINESS.md`
+  states the evidence and the first-deployment checklist.
 - `make e2e-preview` (also in CI): the coordinator sign-in, accessibility and flow specs run
   against the production-built PWA with its service worker, served by `vite preview` under the
   Static Web App's Content-Security-Policy. It caught that hash-wasm needs `'wasm-unsafe-eval'`

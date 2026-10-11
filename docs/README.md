@@ -15,6 +15,7 @@ header wins, and `IMPROVEMENT_BACKLOG.md` §5 lists the known disagreements.
 | Operate the platform: health, logs, jobs, runbooks, backups, alerts | `OPERATIONS.md`, `architecture/PRODUCTION_READINESS.md` |
 | Deploy to Azure for the first time or on a release | `RELEASE_PROCESS.md`, `AZURE_DEPLOYMENT.md`, `ENVIRONMENTS.md` |
 | Know what is still open, who owns it and what to do next | `IMPROVEMENT_BACKLOG.md` |
+| Decide whether the software is ready to deploy, and what the first deployment must verify | `RELEASE_READINESS.md` |
 | Know what shipped and when | `../CHANGELOG.md` |
 | Decode a Spanish domain term or a code identifier | `GLOSSARY.md` |
 | See what was built and verified, requirement by requirement | `IMPLEMENTATION_STATUS.md`, `DELIVERY_REPORT.md` |

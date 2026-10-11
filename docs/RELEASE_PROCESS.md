@@ -24,7 +24,7 @@ per release, written at tag time from the merged pull requests.
 
 ## 2. Definition of ready to release
 
-- `make lint`, `make test`, `pnpm -r test`, `make e2e` green locally and `ci` green on the PR.
+- `make lint`, `make test`, `pnpm -r test`, `make e2e`, `make e2e-preview` and `make e2e-image` green locally and `ci` green on the PR (the last two run the built PWA under the SWA policy and the production image; see `RELEASE_READINESS.md`).
 - `docs/openapi.json` regenerated if an endpoint changed (`make openapi && pnpm gen:api`).
 - Migration reviewed for expand-and-contract (`docs/DATA_MODEL.md` §6): the previous image must
   run against the new schema, because rollback is a traffic shift, never a downgrade.

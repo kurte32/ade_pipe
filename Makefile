@@ -67,6 +67,17 @@ e2e-preview: ## Coordinator specs against the BUILT PWA (service worker active) 
 	for i in $$(seq 1 30); do curl -fsS http://localhost:4173/ >/dev/null 2>&1 && break; sleep 1; done
 	PWA_URL=http://localhost:4173 pnpm --filter e2e exec playwright test tests/pwa.signin.spec.ts tests/pwa.a11y.spec.ts tests/pwa.flow.spec.ts --project=pwa-mobile; status=$$?; pkill -f 'dist-preview --port [4]173' 2>/dev/null; rm -f /tmp/vite-preview.pid; exit $$status
 
+e2e-image: ## Full Playwright suite through the PRODUCTION image (no dev deps, non-root) built from backend/
+	docker build -q --build-arg INSTALL_DEV=false -t pipeline-api:rc backend
+	$(COMPOSE) config --format json | python3 -c "import json,sys; e=json.load(sys.stdin)['services']['api']['environment']; open('/tmp/pipeline-rc.env','w').write(''.join(f'{k}={v}\n' for k,v in e.items() if k not in ('INSTALL_DEV','API_PORT')))"
+	-docker rm -f pipeline-api-rc >/dev/null 2>&1
+	docker run -d --name pipeline-api-rc --network $$($(COMPOSE) config --format json | python3 -c "import json,sys; print(list(json.load(sys.stdin)['networks'].values())[0]['name'])") --env-file /tmp/pipeline-rc.env -p 127.0.0.1:8002:8000 pipeline-api:rc >/dev/null
+	for i in $$(seq 1 30); do curl -fsS http://localhost:8002/readyz >/dev/null 2>&1 && break; sleep 1; done
+	cd apps/pwa-coordinador && (VITE_API_PROXY_TARGET=http://localhost:8002 pnpm exec vite --port 5273 --strictPort > /tmp/pwa-rc.log 2>&1 &)
+	cd apps/web-admin && (VITE_API_PROXY_TARGET=http://localhost:8002 pnpm exec vite --port 5274 --strictPort > /tmp/admin-rc.log 2>&1 &)
+	for i in $$(seq 1 60); do curl -fsS http://localhost:5273 >/dev/null 2>&1 && curl -fsS http://localhost:5274 >/dev/null 2>&1 && break; sleep 1; done
+	PWA_URL=http://localhost:5273 ADMIN_URL=http://localhost:5274 API_URL=http://localhost:8002 pnpm --filter e2e exec playwright test; status=$$?; fuser -k 5273/tcp 5274/tcp >/dev/null 2>&1; docker rm -f pipeline-api-rc >/dev/null 2>&1; exit $$status
+
 job-%: ## Run a background job once: make job-promote | job-outbox | job-purge
 	$(API_RUN) python -m app.jobs.run $*
 

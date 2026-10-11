@@ -173,6 +173,10 @@ jobs:
       # development-mode build with the dev identity provider allowed.
       - name: Coordinator specs against the built PWA (service worker)
         run: make e2e-preview
+      # The artefact that ships: the image without development dependencies, running as the
+      # non-root user, serving the whole suite.
+      - name: Full suite through the production image
+        run: make e2e-image
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
