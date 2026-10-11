@@ -1,6 +1,7 @@
 # Delivery report · Pipeline de Posibles Tiendas
 
-Date: 2026-10-10. Branch: `implementation` (not pushed). Everything below was executed on the
+Date: 2026-10-10. Branch: `implementation` (merged to `main` as PR #1 on 2026-10-11; later work
+is on `prod-readiness` and `ux-redesign`, see `../CHANGELOG.md`). Everything below was executed on the
 development machine described in `IMPLEMENTATION_STATUS.md`. No Azure resources were created,
 modified or destroyed.
 

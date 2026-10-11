@@ -228,7 +228,7 @@ reserved for 90 days.
 | Item | Status |
 |---|---|
 | All Bicep modules and parameter files build and lint | statically validated (`bash infra/bicep/validate.sh`, Bicep 0.48.1) |
-| GitHub workflows | statically validated (actionlint 1.7.12 clean locally and as a CI job; every action pinned to a commit SHA; Bicep CLI pinned with a checksum). Never executed on GitHub. |
+| GitHub workflows | statically validated (actionlint 1.7.12 clean locally and as a CI job; every action pinned to a commit SHA; Bicep CLI pinned with a checksum). CI (`ci.yml`) runs on GitHub and passes; the deploy workflows (`build-deploy.yml`, `deploy-environment.yml`, `drift.yml`) have never executed. |
 | Deployment order (0% revision, migrate, health, shift, automatic rollback) | statically validated; not verified in Azure |
 | Image digest promotion with `az acr import`; per-environment SPA `config.json` | runtime config verified locally in a production build; import not verified in Azure |
 | Resource deployment to a subscription | not verified in Azure |

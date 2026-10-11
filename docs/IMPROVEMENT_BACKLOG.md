@@ -1,0 +1,145 @@
+# Improvement backlog · Pipeline de Posibles Tiendas
+
+Date: 11 October 2026 · Branch `ux-redesign` · **Audience:** everyone who plans work · **When to read:** before starting anything, and to find who owns a decision · **Source of truth:** this file for the list; the source document named in each row for the detail.
+
+ One consolidated, deduplicated list of everything still open across
+`docs/audit/`, `docs/ux/`, `docs/DELIVERY_REPORT.md`, `architecture/` and the design review.
+Each item keeps the id of its source so the detail can be found there. Items recorded as done in
+those documents are not repeated here (the "Done" lists live in `docs/audit/REMEDIATION_PLAN.md`
+and `docs/audit/PRODUCTION_READINESS_PLAN.md`).
+
+How to use this file: pick from the top of the section that matches who you are; when an item is
+closed, mark it in its source document and remove it here. `CHANGELOG.md` records what shipped.
+
+Priority: **P0** blocks production · **P1** needed before the pilot ends · **P2** next quarter ·
+**P3** nice to have. Effort: S (< 1 day), M (1 to 3 days), L (1 to 2 weeks), XL (longer or
+depends on third parties).
+
+## 1. Blocking the first deployment (needs Azure, IT or a business decision)
+
+| Id | Item | Owner | Prio | Effort | Source |
+|---|---|---|---|---|---|
+| SUB | Azure test subscription with rights for resource groups, private networking and Front Door Premium, plus written authorization to create resources | TI | P0 | XL | PRODUCTION_READINESS_PLAN critical path 1 |
+| ENTRA | Entra registrations per environment (`pipeline-api`, `pipeline-pwa-coordinador`, `pipeline-web-admin`), app roles, `requestedAccessTokenVersion=2`, Assignment Required on the API and the admin SPA, groups `PIPELINE-Coordinadores` / `PIPELINE-Admins`, Conditional Access policies | Identidad | P0 | L | AZURE_DEPLOYMENT §2.2 |
+| PARAMS | Replace the all-zero placeholder GUIDs in `infra/bicep/params/*.bicepparam` | TI then engineering | P0 | S | AZURE_DEPLOYMENT §1 |
+| SQL-ADM | `PIPELINE-SQL-Admins-{env}` group, migrate identity membership, one-time `CREATE USER … FROM EXTERNAL PROVIDER` | TI | P0 | S | AZURE_DEPLOYMENT §3 |
+| GRAPH | Admin consent for `User.ReadBasic.All` and `TeamsActivity.Send` on `id-pipeline-api-{env}` | Identidad | P0 | S | DELIVERY_REPORT §8 |
+| OIDC | GitHub OIDC federation per environment, role assignments, `AcrPull` on the dev registry, environment secrets and variables, required reviewers | TI + engineering | P0 | M | AZURE_DEPLOYMENT §2.3 |
+| BRANCH | Branch protection on `main` requiring the `ci` checks | Repo admin | P0 | S | AZURE_DEPLOYMENT §2.3 |
+| DEPLOY-RUN | Run `build-deploy` for real: 0 % revision, migrate job, health, traffic shift, auto-rollback, `az acr import` (all statically validated only) | Engineering | P0 | M | AZURE_DEPLOYMENT §11 |
+| DEFENDER | Defender for Storage plan approved and enabled; EICAR check | Seguridad + TI | P0 | M | DELIVERY_REPORT §8 |
+| IMMUT | Container-level immutability and legal hold on the documents account; confirm the ADR-003 addendum with Seguridad (locking is manual and irreversible) | Seguridad + Legal | P0 | M | AZURE_DEPLOYMENT §11 |
+| MI-KV | Entra-only SQL with managed-identity token and Key Vault references resolved for the API and the migrate job | Engineering + TI | P0 | M | PRODUCTION_READINESS_PLAN 3.3 |
+| Pend 4/5/8 | Business catalogs: required documents, minimum fields per status, return reasons, terminal statuses. Provisional values are seeded | Negocio | P0 | S (after decision) | TO_BE Q5 |
+| Pend 7 | Retention start event, legal hold, treatment of discarded sites | Legal | P0 | S (after decision) | TO_BE Q1 |
+| Pend 13 | Privacy notice shown before capturing owner contact data | Legal | P0 | S (after text) | PRODUCTION_READINESS §8 |
+
+## 2. Required before go-live (test environment exists)
+
+| Id | Item | Owner | Prio | Effort | Source |
+|---|---|---|---|---|---|
+| DEVICE | Offline chain on a real Intune Android phone: 24 h offline token renewal, `loginRedirect` from the installed PWA, selective-wipe behaviour | Engineering + Intune | P0 | M | DELIVERY_REPORT §10 item 1 |
+| MSAL | MSAL sign-in and token negative cases against the real tenant | Engineering + Identidad | P0 | S | PRODUCTION_READINESS_PLAN 3.2 |
+| TEAMS | Publish the Teams app or adopt the Power Automate fallback (ADR-007); verify activity-feed delivery; payload carries no contact data | TI + Seguridad | P0 | L | TO_BE Q4 |
+| FABRIC | Workspace identity, trusted workspace access, OneLake shortcut, Mirroring through the VNet gateway excluding `sitio_contacto`, `auditoria`, `operacion_idempotente`, `carga_fila_staging` | Fabric admin + Datos | P1 | L | AZURE_DEPLOYMENT §2.5 |
+| FD | Front Door, WAF and Private Link origin approval; rate-limit rule verified under a burst | TI | P0 | M | AZURE_DEPLOYMENT §8 |
+| AZ-6 | Restrict the direct Static Web App hostnames to Front Door | Engineering | P1 | S | AZURE_DEPLOYMENT §6 |
+| AZ-4 | Confirm `TRUSTED_PROXY_HOPS` by comparing the ledger IP with the caller IP | Engineering | P1 | S | AZURE_DEPLOYMENT §4 |
+| OBS | App Insights wiring, dashboards and the alert set, each alert forced once | Engineering | P0 | M | OPERATIONS "Alerts to configure" |
+| RESTORE | Restore drill: PITR to a side database, repoint, ledger digest, RLS check, timed against the RTO | Engineering | P0 | M | OPERATIONS "Backup and recovery" |
+| PEN | Penetration test (book now, 2 to 4 weeks lead time) plus the RLS test report | Seguridad | P0 | XL | PRODUCTION_READINESS_PLAN Phase 4 |
+| 150MB | 150 MB resumable upload with a forced disconnect and a 150 MB download through Front Door on 4G | Engineering | P1 | S | DELIVERY_REPORT §6 |
+| RNF-08 | `GET /api/v1/sitios` p95 under 3 s on 4G with the full dataset; bulk preview under 30 s | Engineering | P1 | S | IMPLEMENTATION_STATUS |
+| SIM | Azure SQL failover and Graph outage simulations | Engineering | P1 | S | PRODUCTION_READINESS §8 |
+| SCANS | Dependency and image scans in CI; Defender for Cloud recommendations | Engineering | P1 | S | PRODUCTION_READINESS §8 |
+| LOG-REVIEW | Manual sample of production logs for forbidden fields | Engineering | P1 | S | PRODUCTION_READINESS §8 |
+| RUNBOOKS | Reconcile `docs/OPERATIONS.md` RB-01…RB-10 with `architecture/PRODUCTION_READINESS.md` RB-01…RB-15 (numbering differs); write the missing ones; walk them through with L2 | Architect | P1 | M | see Documentation inconsistencies below |
+| DRIFT | Nightly `drift.yml` green against test and prod | Engineering | P1 | S | AZURE_DEPLOYMENT §8 |
+| GO-LIVE | Production from the same digest and bundles, rollback rehearsal, delete locks and break-glass, go-live checklist signed, two-week pilot in one region | Engineering + Seguridad | P0 | L | PRODUCTION_READINESS_PLAN Phase 5 |
+| SUPPORT | Support model (L1 TI, L2 Subdirección de IA), on-call rota, severity model, paging tool, SLO targets | TI + Subdirección | P1 | M | PRODUCTION_READINESS §1, §7 |
+| P1-LIC | Entra ID P1 for group-to-role assignment, or direct user assignment as fallback | Identidad | P1 | S | RISK_REGISTER R14 |
+
+## 3. Engineering improvements (no external dependency)
+
+| Id | Item | Prio | Effort | Source |
+|---|---|---|---|---|
+| A3 | Validate the Front Door id header in the API so origin restriction is not network-only | P1 | S | TECHNICAL_FINDINGS Info |
+| B-04r | Bulk load: reject a 100k-row XLSX in under 2 s (today 4.8 s) | P2 | M | REMEDIATION_PLAN second pass |
+| D-03r | `/readyz` cannot read `alembic_version` with the app role; expose the applied revision another way (startup log or a grant on a view) | P2 | S | PRODUCTION_READINESS_PLAN progress |
+| LEDGER-DIGEST | Configure external ledger digest storage so `sp_verify_database_ledger` checks against an immutable copy | P2 | S | OPERATIONS RB-08 |
+| PURGE-ERR | Purge job treats any delete failure as "protected, skip"; distinguish a legal hold from a misconfiguration | P2 | S | DELIVERY_REPORT §9 |
+| SHA-STREAM | Streaming SHA-256 for large PDFs on the phone (today the file is hashed in memory) | P3 | M | DELIVERY_REPORT §10 item 7 |
+| XLS-REAL | Verify `.xls` parsing with a real legacy file from the business | P2 | S | DELIVERY_REPORT §9 |
+| UX-QUEUES | Server-side filters `devuelto` and `en_revision_admin` on `GET /api/v1/sitios` so the admin landing page is not capped at 200 sites | P2 | S | ux/UX_VALIDATION §4 |
+| UX-P12 | "Volver a descargar mis sitios" action for a diverged local cache (today: sign out) | P2 | S | ux/UX_VALIDATION §4 |
+| UX-SR | Screen-reader pass (TalkBack, NVDA) and an axe scan in e2e | P1 | M | ux/UX_VALIDATION §3 |
+| UX-TABLES | Card layout for the admin sites table on phones | P3 | M | ux/UX_VALIDATION §4 |
+| UX-CARGAS | Tidy the "Últimas cargas" rows at 390 px | P3 | S | ux/UX_VALIDATION §4 |
+| UX-AUDIT | Glossary tooltip for audit action codes | P3 | S | ux/UX_VALIDATION §4 |
+| UX-LOGO | Replace the re-created roundel with the official vector logo and a raster icon set for the manifest | P1 (Mercadotecnia) | S | ux/DESIGN_SYSTEM §1 |
+| HEALTH-DEPS | `/healthz/deps` (Admin only: Key Vault, JWKS, Graph reachability) as designed in PRODUCTION_READINESS §3 | P2 | S | PRODUCTION_READINESS §3 |
+| LOG-FIELDS | Add `duration_ms`, `revision`, `job_name`, `sitio_id`/`lote_id` where available, as designed in PRODUCTION_READINESS §2.1 | P2 | S | PRODUCTION_READINESS §2.1 |
+| SCHED | Local scheduler uses fixed intervals, Azure uses cron; document only (accepted) | P3 | — | DELIVERY_REPORT §9 |
+
+Observed in code during the documentation pass of 11 October 2026 (read, not reproduced):
+
+| Id | Item | Prio | Effort | Where |
+|---|---|---|---|---|
+| ADMIN-BASE | The admin SPA bundle is built once with base `/` (`VITE_BASE_PATH` is never set in `build-deploy.yml`) but Front Door routes `/admin/*` to it in test and prod; assets and `config.json` would resolve from `/`. Needs a per-environment base or a Front Door rewrite | P0 | S | `.github/workflows/build-deploy.yml` SPA build step; `infra/bicep/modules/frontdoor.bicep` admin route |
+| DEV-ENV-NAME | `params/dev.bicepparam` sets `environmentName: 'test'` for the dev environment; presumably to keep the production guard off, but undocumented | P2 | S | `infra/bicep/params/dev.bicepparam` |
+| UX-SALIR | "Salir" wipes queued captures and photos without warning; add a confirmation when `pendingCount > 0` and a "sincroniza primero" hint | P1 | S | `apps/pwa-coordinador/src/components/Shell.tsx`, `db/schema.ts` `clearLocalData` |
+| TEST-MARK | `tests/integration/test_concurrency.py` has no `integration` marker, so `make test-unit` fails without the stack | P2 | S | `backend/tests/integration/test_concurrency.py` |
+| REASIGNAR-OUTBOX | `reasignar` rewrites `coordinador_oid` on contact, visit, files and upload sessions but not `notificacion_outbox.destinatario_oid`; pending notices stay addressed to the previous coordinator | P2 | S | `backend/app/modules/transiciones/service.py` reasignar |
+| PHOTO-REPLAY | A photo retry replays `POST /subidas` through the idempotency store; the stored `partes_recibidas` can be stale, so parts may be sent again (harmless but wasteful) | P3 | S | `apps/pwa-coordinador/src/sync/engine.ts` foto path |
+| HEAD-DOWNLOAD | The download handler has a HEAD branch but the route is registered as GET only | P3 | S | `backend/app/modules/archivos/router.py` |
+| ENTREGADO | Status `entregado` is seeded as terminal but no code path assigns it; either add the admin action or drop it from the catalog once Negocio decides (pendiente Q5) | P2 | S | `backend/app/models.py`, `transiciones/service.py` |
+| E2E-ENTRA | No automated acceptance run against an Entra-protected environment (Playwright signs in through the dev picker only) | P1 | M | `e2e/helpers/auth.ts` |
+| PROMOTE-GATE | `deploy-test` and `deploy-prod` both depend only on `build`; prod is held by reviewers, not by a green test | P2 | S | `.github/workflows/build-deploy.yml` |
+
+## 4. Product ideas (not in the TDD; need a business owner before any work)
+
+| Idea | Why | Source |
+|---|---|---|
+| Push or Teams notice to the coordinator when a load assigns new sites | Today the coordinator discovers new sites only by opening the app | UX audit, P11 |
+| Admin bulk actions on the sites table (reassign several sites at once) | Reassignment after staff changes is one site at a time | UX audit, A4 |
+| Photo limits per site (10 photos × 1.5 MB proposed) | Phone storage and sync time | Propuesta A3, pendiente 6 |
+| Dashboard for regional managers (Power BI on Fabric) | Out of scope for v1 by TDD 2.2 | TO_BE §1 |
+| AI inspection of uploaded documents | Explicitly deferred by the TDD | TO_BE §1 |
+
+## 5. Documentation inconsistencies to resolve
+
+Found while consolidating; each needs one owner to pick a source of truth.
+
+| Topic | Says A | Says B |
+|---|---|---|
+| Workflows on GitHub | `AZURE_DEPLOYMENT.md` §11: never executed on GitHub | `PRODUCTION_READINESS_PLAN.md`: CI passed on GitHub (PR #2); only the deploy workflows have not run. B is current. |
+| Health endpoints | `OPERATIONS.md`: `/healthz`, `/readyz` (implemented) | `architecture/PRODUCTION_READINESS.md` §3: `/healthz/live`, `/healthz/ready`, `/healthz/deps` (design). Code wins; see HEALTH-DEPS. |
+| Runbook numbering | `OPERATIONS.md` RB-01…RB-10 | `PRODUCTION_READINESS.md` RB-01…RB-15 with different titles. See RUNBOOKS. |
+| 5xx alert threshold | `OPERATIONS.md`: 1 % over 5 min | `PRODUCTION_READINESS.md` §2.5: 5 % over 10 min |
+| Log user field | `OPERATIONS.md`: `user` = 16-char hash | `PRODUCTION_READINESS.md` §2.1: `user_oid`, `user_role` |
+| Storage immutability | `TO_BE.md` §5, `PRODUCTION_READINESS.md` §5: version-level with versioning | `OPERATIONS.md`, `AZURE_DEPLOYMENT.md` §11, ADR-003 addendum: container-level, versioning off. B is current. |
+| Branch of the latest work | `DELIVERY_REPORT.md` header: `implementation` | `IMPLEMENTATION_STATUS.md`, `REMEDIATION_PLAN.md`: `prod-readiness`; UX work on `ux-redesign` |
+
+## 6. Pending business decisions (summary; detail in `architecture/TO_BE.md` §9–10)
+
+| # | Decision | Decides |
+|---|---|---|
+| 1 | Retention start event, legal hold, discarded sites (pendiente 7) | Legal |
+| 2 | Are PDFs produced in the field without signal? | Negocio |
+| 3 | Fabric trusted workspace access to a private storage account | TI + Fabric admin |
+| 4 | Teams app publication or Power Automate fallback | TI + Seguridad |
+| 5 | Terminal statuses and their reasons | Negocio |
+| 6 | Shared phones between coordinators | Negocio + Seguridad |
+| 7 | CI/CD platform, team composition, RPO/RTO (pendiente 12) | TI + Negocio |
+| 8 | Tables replicated to Fabric | Seguridad + Datos |
+| 9 | Required document catalog (pendiente 4) | Negocio |
+| 10 | Minimum fields per status (pendiente 5) | Negocio |
+| 11 | Return-reason catalog (pendiente 8) | Negocio |
+| 12 | Privacy notice text (pendiente 13) | Legal |
+| 13 | Photo limits (pendiente 6) | Negocio |
+| 14 | Meaning of the GPS column (pendiente 2) | Negocio |
+| 15 | Edge for Android mandate and selective wipe (pendiente 10) | Intune |
+| 16 | MSAL cache in `localStorage` | Seguridad |
+| 17 | Private networking mandate (ADR-008) | Seguridad |
+| 18 | Support model, on-call, SLOs | TI + Subdirección de IA |
+| 19 | Formal acceptance of risks R04 and R15 | Seguridad + Negocio |
