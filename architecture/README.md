@@ -1,6 +1,6 @@
 # Architecture documentation · Pipeline de Posibles Tiendas
 
-Planning artifacts produced on 10 October 2026 from TDD v0.1, the Entra ID integration guide, and the design review `../Propuesta_mejoras_TDD_v0.1.md`. No code exists yet; these documents define the path to a production-ready platform on Azure.
+Planning artifacts produced on 10 October 2026 from TDD v0.1, the Entra ID integration guide, and the design review `../Propuesta_mejoras_TDD_v0.1.md`. They defined the path to the platform that now exists in this repository; `AS_IS.md` records the state before implementation, and `../docs/RELEASE_READINESS.md` the current verified state.
 
 | Document | Purpose |
 |---|---|
