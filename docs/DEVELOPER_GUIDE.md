@@ -37,7 +37,7 @@ packages/auth           AuthProvider: dev (tools/dev-idp) and msal; runtime conf
 packages/api-client     typed fetch wrapper, Problem Details parsing, generated OpenAPI types
 e2e                     Playwright: global setup builds a site pool through the real bulk load
 tools/dev-idp           local OIDC issuer (RS256, Entra v2 claims), users.json
-infra/bicep             Azure IaC (13 modules), params per environment, validate.sh
+infra/bicep             Azure IaC (14 modules), params per environment, validate.sh
 .github/workflows       ci, build-deploy, deploy-environment (reusable), drift
 docs/, architecture/    see docs/README.md
 ```
@@ -164,7 +164,7 @@ is pinned to a commit SHA. Locally: `make lint && make test && pnpm -r test && m
 `make e2e-preview` runs the coordinator specs against the built PWA served by `vite preview`
 (service worker active), which the dev-server run never exercises; CI runs it after `make e2e`.
 
-Test counts on this branch: backend 183 (111 unit, 72 integration; `pytest --collect-only -q -m integration`), frontend 40, Playwright 18. CI also runs `alembic check` after the upgrade.
+Test counts on this branch (11 October 2026): backend 191 (`pytest --collect-only -q -m integration` lists the integration subset), frontend 42, Playwright 18. The integration fixtures seed the dev equivalences themselves, so the suite does not depend on `make db-seed` or on test order. CI also runs `alembic check` after the upgrade.
 Every file under `tests/integration/` carries `pytestmark = pytest.mark.integration`, so
 `make test-unit` runs without the stack; keep the marker when adding a file there.
 

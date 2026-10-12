@@ -68,6 +68,13 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   stack, quick start with the local URLs, every command, the quality gates and their last results,
   environments, the deployment flow, repository map, documentation by role, conventions and what is
   still open. `architecture/README.md` no longer says that no code exists.
+- CI: the integration fixtures seed the ten dev equivalences themselves (`dev_equivalencias`), so
+  `test_reasignar_moves_pending_notifications` no longer depends on `make db-seed` or on test order
+  (it failed on the GitHub runner, which only initialises and migrates the database); the deploy
+  smoke test reads asset paths with `while read` (shellcheck SC2013 made actionlint fail on the
+  runner, where shellcheck is installed). Six stale documentation lines corrected (API docs served
+  only in `local`, 14 Bicep modules, current test counts, branch convention, restore drill status,
+  `/readyz` schema fields).
 
 ### Changed
 - Both apps redesigned to the Tiendas 3B brand with a shared design system in `packages/ui`

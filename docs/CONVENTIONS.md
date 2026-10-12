@@ -63,5 +63,5 @@ Ownership while working in parallel: a module owner edits only its directory. Sh
 
 ## Git
 
-- Branch `implementation` for this build. Conventional commit subjects (`feat:`, `fix:`, `test:`, `docs:`, `infra:`). Commit after each milestone with tests passing.
+- One topic branch per change, merged into `main` by pull request with CI green (`docs/RELEASE_PROCESS.md` §1). Conventional commit subjects (`feat:`, `fix:`, `test:`, `docs:`, `infra:`, `chore:`). Commit after each milestone with tests passing.
 - Never commit `.env`, keys, node_modules, or generated blobs.

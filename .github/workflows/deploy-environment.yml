@@ -205,9 +205,9 @@ jobs:
                 ADMIN="https://${{ steps.deploy.outputs.frontDoorAdminHostname }}"
                 # The admin SPA must boot on its own host: every script it references must load (INF-1).
                 curl -fsS "$ADMIN/" -o /tmp/admin.html
-                for src in $(grep -oE 'src="[^"]+\.js"' /tmp/admin.html | sed 's/src="//;s/"$//'); do
+                grep -oE 'src="[^"]+\.js"' /tmp/admin.html | sed 's/src="//;s/"$//' | while read -r src; do
                   curl -fsS -o /dev/null -w "%{content_type} $src\n" "$ADMIN/${src#/}" | grep -qi javascript || { echo "admin asset $src did not load"; exit 1; }
-                done
+                done || exit 1
               fi
               exit 0
             fi

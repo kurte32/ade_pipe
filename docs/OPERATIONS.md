@@ -8,7 +8,7 @@ How the platform is observed, diagnosed and recovered. Targets and alert definit
 | Endpoint | Meaning | Used by |
 |---|---|---|
 | `GET /healthz` | Process is up. No dependencies. | Container Apps liveness probe, Front Door health probe |
-| `GET /readyz` | Database `SELECT 1` and both storage containers reachable. 503 with per-check detail when degraded. | Container Apps readiness and startup probes, `make health` |
+| `GET /readyz` | Database `SELECT 1`, the applied Alembic revision versus the code's head (`schema_revision`, `schema_head`, `schema`: `ok`, `behind` or `ahead-or-unknown`) and both storage containers reachable. 503 with per-check detail when degraded, including a database behind the code (a deployment that skipped the migrate job). | Container Apps readiness and startup probes, `make health` |
 
 ## Logs
 
@@ -132,7 +132,7 @@ Managed certificates on the default `*.azurefd.net` hosts renew automatically. A
 | Staging | Transient; lifecycle deletes after 7 days | same |
 | Audit ledger | Append-only; digests can be stored externally (not configured in this build) | same table type in SQL Server 2022 |
 
-Restore drill: documented in `architecture/PRODUCTION_READINESS.md` section 5; not executed in this build because no Azure environment exists.
+Restore drill: procedure in RB-08 and `architecture/PRODUCTION_READINESS.md` section 5. Rehearsed locally on 11 October 2026 (backup, restore to a side database, ledger verification, RLS on the copy; `docs/RELEASE_READINESS.md` §2). Azure point-in-time restore itself still needs an Azure environment (backlog RESTORE).
 
 ## Alerts to configure (Azure Monitor)
 
