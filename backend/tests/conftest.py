@@ -103,8 +103,20 @@ def make_sitio(
     return s
 
 
+@pytest.fixture(scope="session")
+def dev_equivalencias(dev_users) -> None:  # type: ignore[no-untyped-def]
+    """The ten dev coordinators have an active equivalence (the same upsert `make db-seed` runs).
+
+    Reassignment refuses an oid without one (audit DAT-4), so any test that moves a site to
+    coordinator B needs this; CI only initialises and migrates the database, it never seeds it.
+    """
+    from app.modules.equivalencias.service import seed_dev_equivalencias
+
+    seed_dev_equivalencias()
+
+
 @pytest.fixture
-def two_sites(dev_users):  # type: ignore[no-untyped-def]
+def two_sites(dev_users, dev_equivalencias):  # type: ignore[no-untyped-def]
     """One site for coordinator A (ard) and one for coordinator B (usa), inserted as Sistema."""
     from app.core.db import system_session
 

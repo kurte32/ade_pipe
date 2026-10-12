@@ -16,7 +16,7 @@ sync and the upload protocol. Line references point into `backend/app`.
   bytes) and the file download (byte stream).
 - Every request except `/healthz` and `/readyz` needs `Authorization: Bearer <token>` and one of
   the two application roles. A valid token with no role gets 403 everywhere.
-- `/api/docs` and `/api/openapi.json` are served locally and in `test`, never in `production`.
+- `/api/docs` and `/api/openapi.json` are served only with `ENVIRONMENT=local`; every deployed environment (`test`, `production`) hides them. The contract is committed as `docs/openapi.json`.
 
 ## 2. Authentication and roles
 
