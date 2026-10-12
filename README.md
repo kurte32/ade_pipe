@@ -568,7 +568,7 @@ start), `DEV_IDP_PUBLIC_URL`, and the host ports `SQL_PORT`, `AZURITE_PORT`, `DE
 | `VITE_TENANT_ID`, `VITE_SPA_CLIENT_ID`, `VITE_API_CLIENT_ID` | runtime via `config.json`, or `.env.development` locally | Entra ids of this environment; the deploy workflow writes `config.json` next to the bundle |
 | `VITE_API_BASE_URL` | runtime via `config.json` | Only when the API is not same-origin (dev without Front Door); empty otherwise |
 | `VITE_DEV_IDP_URL` | local | `/dev-idp` (proxied by Vite) |
-| `VITE_ALLOW_DEV_AUTH` | `make e2e-preview` | Allows the dev picker in a production-mode build for local testing only |
+| `VITE_ALLOW_DEV_AUTH` | `make e2e-preview` | Allows the dev picker in a built bundle (`vite build --mode development`) served by `vite preview`, for local testing only |
 
 Full per-environment table, including how Bicep computes each value:
 [`docs/ENVIRONMENTS.md`](docs/ENVIRONMENTS.md).
@@ -710,8 +710,9 @@ Owner-scoped tables carry `coordinador_oid` so RLS filters them without a join; 
 owner moves every one of them in one transaction (`sitios.cambiar_propietario`). Full column list,
 lifecycles and support queries: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 
-Blob layout: `staging/<session>/…` while uploading; `documents/pipeline/{sitio}/{tipo}/…` once
-published.
+Blob layout: `subidas/<session id>/<file name>` in the staging container while uploading or
+scanning; `pipeline/<sitio id>/<tipo>/<archivo id>_<sha256>.<ext>` in the documents container once
+published (`backend/app/modules/archivos/validation.py`).
 
 ### External dependencies and what happens without them
 
@@ -793,8 +794,10 @@ test and production deployments (`v1.0.0` would do nothing). `CHANGELOG.md` is t
 
 ### Commands and last results
 
-Results below are from this branch on the local stack on 11 October 2026 unless stated. CI runs the
-same gates on every pull request (`.github/workflows/ci.yml`: backend, frontend, e2e against the
+Results below were obtained on the local stack: `make test`, `pnpm test` and `make lint` on this
+branch (`readme-ci-fixes`, 12 October 2026); the Playwright, Bicep, Alembic and scan rows at commit
+`a7705e5` (11 October 2026, since merged into `main`), whose code this branch changes only in a
+test fixture and a workflow script. CI runs the same gates on every pull request (`.github/workflows/ci.yml`: backend, frontend, e2e against the
 compose stack, gitleaks, Bicep, actionlint) with every action pinned to a commit SHA and the
 service images pinned to the same versions as Compose.
 
@@ -804,7 +807,7 @@ service images pinned to the same versions as Compose.
 | `make test-unit` | the subset without the `integration` marker; no stack needed |
 | `pnpm test` | 42 passed (auth 8, api-client 5, web-admin 7, pwa-coordinador 22) |
 | `make lint` | clean |
-| `make e2e` | 18 passed (also on GitHub runners in the merged pull request) |
+| `make e2e` | 18 passed at `a7705e5`; also passed on the GitHub runner for pull request #3 |
 | `make e2e-preview` | 9 passed |
 | `make e2e-image` | 18 passed through the production image |
 | `make bicep-lint`, `actionlint` | 14 modules and 3 parameter files OK; workflows clean |
