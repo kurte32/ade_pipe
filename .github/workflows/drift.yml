@@ -40,12 +40,24 @@ jobs:
             --query "properties.template.containers[0].image" -o tsv)
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
+      # Same parameter resolution as the deploy (audit CI-2): the revision serving traffic and the
+      # dev ingress CIDRs, otherwise the what-if reports a permanent Modify on the container app.
+      - name: Revision serving traffic now
+        id: current
+        run: |
+          APP="ca-pipeline-api-${{ matrix.environment }}"
+          CUR=$(az containerapp ingress traffic show -g "${{ vars.RESOURCE_GROUP }}" -n "$APP" \
+            --query "[?weight==\`100\`].revisionName | [0]" -o tsv 2>/dev/null || true)
+          echo "revision=$CUR" >> "$GITHUB_OUTPUT"
+
       - name: What-if
+        env:
+          DEV_ALLOWED_INGRESS_CIDRS: ${{ vars.DEV_ALLOWED_INGRESS_CIDRS }}
         run: |
           az deployment group what-if -g "${{ vars.RESOURCE_GROUP }}" \
             --template-file infra/bicep/main.bicep \
             --parameters "infra/bicep/params/${{ matrix.environment }}.bicepparam" \
-            --parameters apiImage="${{ steps.image.outputs.image }}" \
+            --parameters apiImage="${{ steps.image.outputs.image }}" trafficRevision="${{ steps.current.outputs.revision }}" \
             --no-pretty-print -o json > /tmp/whatif.json
           COUNT=$(jq '[.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore")] | length' /tmp/whatif.json)
           jq -r '.changes[] | select(.changeType != "NoChange" and .changeType != "Ignore") | "\(.changeType) \(.resourceId)"' /tmp/whatif.json

@@ -19,7 +19,7 @@ from sqlalchemy import select
 from app.core.clock import to_utc_naive, utcnow
 from app.core.db import SYSTEM_OID, system_session
 from app.core.storage import BlobStore, get_blob_store
-from app.models import Auditoria, SitioArchivo
+from app.models import Auditoria, Sitio, SitioArchivo
 
 log = structlog.get_logger()
 
@@ -32,15 +32,46 @@ def _purge_one(archivo_id: uuid.UUID, store: BlobStore, now: datetime) -> str:
         try:
             store.delete("documents", archivo.ruta_blob)
         except HttpResponseError as exc:
+            status = getattr(exc, "status_code", None)
+            if status not in (403, 409):
+                # Not a retention block (immutability policy or legal hold answer 409; a missing
+                # delete permission 403): a transient or configuration error, retried next run
+                # and visible as purge_failed in the alerts (backlog PURGE-ERR).
+                raise
             log.warning(
                 "purge_blocked",
                 archivo_id=str(archivo_id),
                 reason=type(exc).__name__,
-                status=getattr(exc, "status_code", None),
+                status=status,
+            )
+            # A legal hold or immutability policy stopping the purge is itself a retention event
+            # that compliance must be able to see in the ledger (audit DAT-13).
+            session.add(
+                Auditoria(
+                    fecha_utc=now,
+                    usuario_oid=SYSTEM_OID,
+                    rol="Sistema",
+                    accion="purga_bloqueada",
+                    entidad="sitio_archivo",
+                    entidad_id=str(archivo_id),
+                    ip=None,
+                    correlation_id=None,
+                    detalle=json.dumps(
+                        {
+                            "sitio_id": archivo.sitio_id,
+                            "motivo": type(exc).__name__,
+                            "status": getattr(exc, "status_code", None),
+                        }
+                    ),
+                )
             )
             return "blocked"
         archivo.estado = "purgado"
         archivo.purgado_utc = now
+        # Bump the site's version so devices refresh their file list (audit DAT-11).
+        sitio = session.get(Sitio, archivo.sitio_id)
+        if sitio is not None:
+            sitio.actualizado_utc = now
         session.add(
             Auditoria(
                 fecha_utc=now,

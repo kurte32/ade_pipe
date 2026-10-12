@@ -1,0 +1,13 @@
+# gitleaks configuration (CI secret scan). Extends the default rules.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Well-known public development values, not secrets"
+regexes = [
+  # Azurite's published emulator account key (Microsoft docs); used only by the local compose stack.
+  '''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
+]
+paths = [
+  '''\.env\.example$''',
+]

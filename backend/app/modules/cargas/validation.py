@@ -92,6 +92,8 @@ def fold(text: str) -> str:
 
 
 def neutralize(value: str | None) -> str | None:
+    """Formula-injection guard for spreadsheet EXPORTS (TDD 8.1). Not applied on load: stored
+    values must be the file's own (audit DAT-17); call this when writing cells to a file."""
     if value is None:
         return None
     if value.startswith(FORMULA_PREFIXES):
@@ -205,9 +207,7 @@ def validate_rows(
     suspicious = [fold(w) for w in settings.suspicious_words]
 
     for idx, row in enumerate(rows, start=2):  # row 1 is the header
-        res = RowResult(
-            num_fila=idx, resultado=RESULT_OK, originales={k: neutralize(v) for k, v in row.items()}
-        )
+        res = RowResult(num_fila=idx, resultado=RESULT_OK, originales=dict(row.items()))
         results.append(res)
         norm: dict[str, Any] = {}
 

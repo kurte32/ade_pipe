@@ -20,7 +20,7 @@ test.describe("HU-03 / HU-04: bulk load with preview, decisions and confirm", ()
     await page.getByTestId("carga-submit").click();
 
     await expect(page).toHaveURL(/\/cargas\/[0-9a-f-]{36}$/);
-    await expect(page.getByTestId("lote-estado")).toHaveText("vista_previa");
+    await expect(page.getByTestId("lote-estado")).toHaveText("Vista previa");
     await expect(page.getByTestId("count-error")).toHaveText("1");
     const warnings = Number(await page.getByTestId("count-advertencia").textContent());
     expect(warnings).toBeGreaterThanOrEqual(1);
@@ -45,7 +45,7 @@ test.describe("HU-03 / HU-04: bulk load with preview, decisions and confirm", ()
 
     await page.getByTestId("confirmar-carga").click();
     await expect(page.getByTestId("confirm-result")).toContainText("4 sitios insertados");
-    await expect(page.getByTestId("lote-estado")).toHaveText("confirmado");
+    await expect(page.getByTestId("lote-estado")).toHaveText("Confirmada");
 
     // The new site is searchable in Sitios.
     await page.getByRole("link", { name: "Sitios" }).click();

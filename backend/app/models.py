@@ -16,7 +16,6 @@ from sqlalchemy import (
     CHAR,
     BigInteger,
     Boolean,
-    DateTime,
     FetchedValue,
     ForeignKey,
     Index,
@@ -25,9 +24,16 @@ from sqlalchemy import (
     Unicode,
     UnicodeText,
     UniqueConstraint,
+    text,
 )
-from sqlalchemy.dialects.mssql import TIMESTAMP, UNIQUEIDENTIFIER
+from sqlalchemy.dialects.mssql import DATETIME2, TIMESTAMP, UNIQUEIDENTIFIER
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+def _utc_ts() -> DATETIME2:
+    """datetime2(3) for every timestamp (audit DAT-14): same precision as the ledger tables."""
+    return DATETIME2(precision=3)  # type: ignore[no-untyped-call]
+
 
 LEDGER_TABLES = {"auditoria", "sitio_estatus_historial"}
 
@@ -78,7 +84,7 @@ class CoordinadorEquivalencia(Base):
     nombre: Mapped[str | None] = mapped_column(Unicode(200))
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     actualizado_por: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
-    actualizado_utc: Mapped[datetime] = mapped_column(DateTime)
+    actualizado_utc: Mapped[datetime] = mapped_column(_utc_ts())
 
 
 class CargaLote(Base):
@@ -87,13 +93,13 @@ class CargaLote(Base):
     archivo_nombre: Mapped[str] = mapped_column(Unicode(260))
     hash: Mapped[str] = mapped_column(CHAR(64))
     usuario_admin: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
-    fecha_utc: Mapped[datetime] = mapped_column(DateTime)
+    fecha_utc: Mapped[datetime] = mapped_column(_utc_ts())
     filas_total: Mapped[int] = mapped_column(Integer, default=0)
     filas_ok: Mapped[int] = mapped_column(Integer, default=0)
     filas_advertencia: Mapped[int] = mapped_column(Integer, default=0)
     filas_error: Mapped[int] = mapped_column(Integer, default=0)
     estado: Mapped[str] = mapped_column(Unicode(20), default="vista_previa")
-    confirmado_utc: Mapped[datetime | None] = mapped_column(DateTime)
+    confirmado_utc: Mapped[datetime | None] = mapped_column(_utc_ts())
     filas_insertadas: Mapped[int | None] = mapped_column(Integer)
     filas_actualizadas: Mapped[int | None] = mapped_column(Integer)
     filas_revision: Mapped[int | None] = mapped_column(Integer)
@@ -115,7 +121,7 @@ class CargaFilaStaging(Base):
     motivos: Mapped[str] = mapped_column(UnicodeText, default="[]")
     decision_admin: Mapped[str | None] = mapped_column(Unicode(10))
     decidido_por: Mapped[uuid.UUID | None] = mapped_column(UNIQUEIDENTIFIER)
-    decidido_utc: Mapped[datetime | None] = mapped_column(DateTime)
+    decidido_utc: Mapped[datetime | None] = mapped_column(_utc_ts())
     origen_id: Mapped[int | None] = mapped_column(Integer)
     accion_prevista: Mapped[str | None] = mapped_column(Unicode(12))
     lote: Mapped[CargaLote] = relationship(back_populates="filas")
@@ -134,7 +140,7 @@ class Sitio(Base):
     potencial: Mapped[str] = mapped_column(Unicode(20))
     campos_capturados: Mapped[int] = mapped_column(Integer)
     campos_total: Mapped[int] = mapped_column(Integer)
-    fecha_origen_utc: Mapped[datetime] = mapped_column(DateTime)
+    fecha_origen_utc: Mapped[datetime] = mapped_column(_utc_ts())
     fecha_origen_texto: Mapped[str] = mapped_column(Unicode(40))
     estatus: Mapped[str] = mapped_column(Unicode(40), ForeignKey("estatus.codigo"))
     coordinador_oid: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
@@ -148,8 +154,8 @@ class Sitio(Base):
     carga_lote_id: Mapped[uuid.UUID | None] = mapped_column(
         UNIQUEIDENTIFIER, ForeignKey("carga_lote.id")
     )
-    creado_utc: Mapped[datetime] = mapped_column(DateTime)
-    actualizado_utc: Mapped[datetime] = mapped_column(DateTime)
+    creado_utc: Mapped[datetime] = mapped_column(_utc_ts())
+    actualizado_utc: Mapped[datetime] = mapped_column(_utc_ts())
     rowversion: Mapped[bytes] = mapped_column(
         TIMESTAMP,
         nullable=False,
@@ -185,7 +191,7 @@ class SitioContacto(Base):
     correo: Mapped[str | None] = mapped_column(Unicode(200))
     notas: Mapped[str | None] = mapped_column(Unicode(1000))
     capturado_por: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
-    capturado_utc: Mapped[datetime] = mapped_column(DateTime)
+    capturado_utc: Mapped[datetime] = mapped_column(_utc_ts())
     sitio: Mapped[Sitio] = relationship(back_populates="contacto")
 
 
@@ -197,9 +203,9 @@ class SitioVisita(Base):
     fondo_m: Mapped[Decimal] = mapped_column(Numeric(8, 2))
     area_m2: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     notas: Mapped[str | None] = mapped_column(Unicode(1000))
-    fecha_visita_utc: Mapped[datetime] = mapped_column(DateTime)
+    fecha_visita_utc: Mapped[datetime] = mapped_column(_utc_ts())
     capturado_por: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
-    capturado_utc: Mapped[datetime] = mapped_column(DateTime)
+    capturado_utc: Mapped[datetime] = mapped_column(_utc_ts())
     sitio: Mapped[Sitio] = relationship(back_populates="visita")
 
 
@@ -222,11 +228,22 @@ class SitioArchivo(Base):
     vigente: Mapped[bool] = mapped_column(Boolean, default=True)
     estado: Mapped[str] = mapped_column(Unicode(12), default="publicado")  # publicado | purgado
     subido_por: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
-    subido_utc: Mapped[datetime] = mapped_column(DateTime)
-    purga_utc: Mapped[datetime | None] = mapped_column(DateTime)
-    purgado_utc: Mapped[datetime | None] = mapped_column(DateTime)
+    subido_utc: Mapped[datetime] = mapped_column(_utc_ts())
+    purga_utc: Mapped[datetime | None] = mapped_column(_utc_ts())
+    purgado_utc: Mapped[datetime | None] = mapped_column(_utc_ts())
     sitio: Mapped[Sitio] = relationship(back_populates="archivos")
-    __table_args__ = (Index("ix_sitio_archivo_sitio", "sitio_id", "tipo", "vigente"),)
+    __table_args__ = (
+        Index("ix_sitio_archivo_sitio", "sitio_id", "tipo", "vigente"),
+        # One current copy per document type (audit DAT-3); promote() retires the previous copy
+        # in the same transaction, so the index only ever rejects a concurrent duplicate.
+        Index(
+            "ux_sitio_archivo_documento_vigente",
+            "sitio_id",
+            "tipo_documento",
+            unique=True,
+            mssql_where=text("vigente = 1 AND tipo = 'documento'"),
+        ),
+    )
 
 
 class SubidaSesion(Base):
@@ -235,7 +252,9 @@ class SubidaSesion(Base):
     sitio_id: Mapped[int] = mapped_column(Integer, ForeignKey("sitio.id"))
     coordinador_oid: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
     tipo: Mapped[str] = mapped_column(Unicode(10))
-    tipo_documento: Mapped[str | None] = mapped_column(Unicode(50))
+    tipo_documento: Mapped[str | None] = mapped_column(
+        Unicode(50), ForeignKey("catalogo_tipo_documento.id")
+    )
     nombre_original: Mapped[str] = mapped_column(Unicode(260))
     content_type: Mapped[str] = mapped_column(Unicode(100))
     bytes_total: Mapped[int] = mapped_column(BigInteger)
@@ -248,9 +267,9 @@ class SubidaSesion(Base):
     blob_staging: Mapped[str] = mapped_column(Unicode(400))
     paginas: Mapped[int | None] = mapped_column(Integer)
     archivo_id: Mapped[uuid.UUID | None] = mapped_column(UNIQUEIDENTIFIER)
-    creado_utc: Mapped[datetime] = mapped_column(DateTime)
-    actualizado_utc: Mapped[datetime] = mapped_column(DateTime)
-    expira_utc: Mapped[datetime] = mapped_column(DateTime)
+    creado_utc: Mapped[datetime] = mapped_column(_utc_ts())
+    actualizado_utc: Mapped[datetime] = mapped_column(_utc_ts())
+    expira_utc: Mapped[datetime] = mapped_column(_utc_ts())
 
 
 class NotificacionOutbox(Base):
@@ -262,11 +281,11 @@ class NotificacionOutbox(Base):
     cuerpo: Mapped[str] = mapped_column(UnicodeText)
     intentos: Mapped[int] = mapped_column(Integer, default=0)
     estado: Mapped[str] = mapped_column(Unicode(12), default="pendiente")
-    siguiente_intento_utc: Mapped[datetime] = mapped_column(DateTime)
-    enviada_utc: Mapped[datetime | None] = mapped_column(DateTime)
+    siguiente_intento_utc: Mapped[datetime] = mapped_column(_utc_ts())
+    enviada_utc: Mapped[datetime | None] = mapped_column(_utc_ts())
     ultimo_error: Mapped[str | None] = mapped_column(Unicode(400))
-    leida_utc: Mapped[datetime | None] = mapped_column(DateTime)
-    creado_utc: Mapped[datetime] = mapped_column(DateTime)
+    leida_utc: Mapped[datetime | None] = mapped_column(_utc_ts())
+    creado_utc: Mapped[datetime] = mapped_column(_utc_ts())
 
 
 class OperacionIdempotente(Base):
@@ -277,7 +296,7 @@ class OperacionIdempotente(Base):
     hash_cuerpo: Mapped[str] = mapped_column(CHAR(64))
     codigo_respuesta: Mapped[int] = mapped_column(Integer)
     cuerpo_respuesta: Mapped[str] = mapped_column(UnicodeText)
-    creado_utc: Mapped[datetime] = mapped_column(DateTime)
+    creado_utc: Mapped[datetime] = mapped_column(_utc_ts())
 
 
 # Ledger tables (append-only). Created by raw DDL in the baseline migration.
@@ -291,14 +310,14 @@ class SitioEstatusHistorial(Base):
     motivo: Mapped[str | None] = mapped_column(Unicode(40))
     comentario: Mapped[str | None] = mapped_column(Unicode(1000))
     usuario_oid: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
-    fecha_utc: Mapped[datetime] = mapped_column(DateTime)
+    fecha_utc: Mapped[datetime] = mapped_column(_utc_ts())
     origen: Mapped[str] = mapped_column(Unicode(10))
 
 
 class Auditoria(Base):
     __tablename__ = "auditoria"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    fecha_utc: Mapped[datetime] = mapped_column(DateTime)
+    fecha_utc: Mapped[datetime] = mapped_column(_utc_ts())
     usuario_oid: Mapped[uuid.UUID] = mapped_column(UNIQUEIDENTIFIER)
     rol: Mapped[str] = mapped_column(Unicode(20))
     accion: Mapped[str] = mapped_column(Unicode(60))

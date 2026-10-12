@@ -7,7 +7,7 @@
  * - 412 / 422 / 404 / 409 block that operation and stop that site's chain; the server's current
  *   state (412 `current`) is stored for the conflict panel.
  * - Network failures and transient server errors (429, 5xx, timeouts) keep operations `pendiente`
- *   and auto-retry on the next sync, capped at MAX_TRANSIENT_RETRIES before surfacing as `error`.
+ *   and auto-retry on the next sync with exponential backoff (never a terminal state).
  *   401 or InteractionRequired flags "needs login".
  * - Runs in the foreground only (the service worker cannot obtain tokens).
  */
@@ -16,7 +16,7 @@ import { ApiError, NetworkError, type Api } from "@pipeline/api-client";
 import { InteractionRequired, OfflineError } from "@pipeline/auth";
 
 import type { FotoLocal, Operacion, OperacionTipo, PipelineDb } from "../db/schema";
-import { getMeta, setMeta } from "../db/schema";
+import { clearLocalData, getMeta, setMeta } from "../db/schema";
 import type {
   ArchivoMeta,
   ContactoIn,
@@ -30,10 +30,27 @@ import type {
 } from "../lib/types";
 
 /** How many times a transient (429/5xx/timeout) failure is auto-retried before it surfaces (E-1). */
-export const MAX_TRANSIENT_RETRIES = 5;
 
 export const META_MAX_ROWVERSION = "sitios.maxRowversion";
 export const META_LAST_SYNC = "sync.lastAt";
+/** oid of the account the local store belongs to; a different account must start empty (FE-1). */
+export const META_OWNER_OID = "sync.ownerOid";
+/** Count of queued changes dropped because their site was reassigned away (FE-2); shown once. */
+export const META_LOST_OPS = "sync.lostOps";
+
+/**
+ * Make the local store belong to `oid`. When another account owned it (or nobody did), every
+ * cached site, queued operation, photo and cursor is dropped first: a second coordinator on the
+ * same phone must never see the first one's data, send their queued writes, or inherit their
+ * delta watermark. Returns true when the store was cleared.
+ */
+export async function ensureOwner(db: PipelineDb, oid: string): Promise<boolean> {
+  const owner = await getMeta<string>(db, META_OWNER_OID);
+  if (owner === oid) return false;
+  await clearLocalData(db);
+  await setMeta(db, META_OWNER_OID, oid);
+  return true;
+}
 /** "site:etag" -> etag produced by this device's own successful write on top of it. */
 export const META_ETAG_SUCCESSORS = "sync.etagSuccessors";
 const MAX_SUCCESSORS = 200;
@@ -181,7 +198,7 @@ async function sendOne(deps: SyncDeps, op: Operacion, etag: string): Promise<Ste
       await db.operaciones.delete(op.id); // nothing to upload (blob gone)
       return { kind: "ok", etag };
     }
-    await uploadFoto(api, op, foto);
+    await uploadFoto(api, db, op, foto);
     await db.fotos.delete(fotoId);
     return { kind: "ok", etag };
   } catch (e) {
@@ -189,7 +206,13 @@ async function sendOne(deps: SyncDeps, op: Operacion, etag: string): Promise<Ste
   }
 }
 
-async function uploadFoto(api: Api, op: Operacion, foto: FotoLocal): Promise<ArchivoMeta | null> {
+async function uploadFoto(
+  api: Api,
+  db: PipelineDb,
+  op: Operacion,
+  foto: FotoLocal,
+  retried = false,
+): Promise<ArchivoMeta | null> {
   const created = await api.post<SubidaOut>(
     "/api/v1/subidas",
     {
@@ -202,8 +225,17 @@ async function uploadFoto(api: Api, op: Operacion, foto: FotoLocal): Promise<Arc
     },
     { idempotencyKey: op.idempotencyKey },
   );
-  const session = created.data;
+  // A replay (same Idempotency-Key after a lost response) returns the session as it was when it
+  // was created, not as it is now; trusting that body sent parts to a session that was already
+  // published, or expired, and blocked the op for good (audit FE-4). Read the live state instead.
+  const session = await api.get<SubidaOut>(`/api/v1/subidas/${created.data.id}`);
   if (session.estado === "publicada") return null;
+  if (session.estado === "expirada" || session.estado === "rechazada" || session.estado === "cancelada") {
+    if (retried) throw new Error(`La sesión de subida quedó en estado '${session.estado}'`);
+    const idempotencyKey = uuid();
+    await db.operaciones.update(op.id, { idempotencyKey });
+    return uploadFoto(api, db, { ...op, idempotencyKey }, foto, true);
+  }
   const received = new Set(session.partes_recibidas);
   for (let n = 0; n < session.partes_total; n++) {
     if (received.has(n)) continue;
@@ -217,7 +249,16 @@ async function uploadFoto(api: Api, op: Operacion, foto: FotoLocal): Promise<Arc
 }
 
 function isTransient(e: unknown): boolean {
-  return e instanceof ApiError && (e.status === 429 || e.status >= 500);
+  if (!(e instanceof ApiError)) return false;
+  // 409 on a coordinator write means "the same Idempotency-Key is still being processed" (two
+  // tabs, or a retry racing its own first attempt): wait and retry, do not block (audit FE-11).
+  return e.status === 429 || e.status >= 500 || e.status === 409;
+}
+
+/** Backoff after `intentos` transient failures: immediate once, then 30 s doubling, capped (FE-14). */
+export function backoffMs(intentos: number): number {
+  if (intentos <= 1) return 0;
+  return Math.min(30_000 * 2 ** (intentos - 2), 30 * 60_000);
 }
 
 async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promise<StepResult> {
@@ -225,7 +266,7 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
   if (e instanceof InteractionRequired) return { kind: "login" };
   if (e instanceof ApiError) {
     if (e.status === 401) return { kind: "login" };
-    if ([412, 422, 404, 409, 428, 410].includes(e.status)) {
+    if ([412, 422, 404, 428, 410].includes(e.status)) {
       const current = (e.current as SitioDetail | undefined) ?? null;
       const faltantes = (e.problem?.["faltantes"] as string[] | undefined) ?? undefined;
       const siguiente = e.problem?.["estatus_siguiente"] as string | undefined;
@@ -243,15 +284,13 @@ async function classifyFailure(db: PipelineDb, op: Operacion, e: unknown): Promi
     // so a genuinely poisoned request eventually surfaces for manual resolution.
     if (isTransient(e)) {
       const intentos = (op.intentos ?? 0) + 1;
-      if (intentos >= MAX_TRANSIENT_RETRIES) {
-        await db.operaciones.update(op.id, {
-          estado: "error",
-          intentos,
-          error: "No se pudo sincronizar tras varios intentos. Reintenta cuando la conexión sea estable.",
-        });
-        return { kind: "error" };
-      }
-      await db.operaciones.update(op.id, { estado: "pendiente", intentos });
+      // Never a terminal state: an outage longer than a few retries used to turn the head op of
+      // every site into `error`, each needing a manual retry (audit FE-14). Back off instead.
+      await db.operaciones.update(op.id, {
+        estado: "pendiente",
+        intentos,
+        nextAttemptAt: Date.now() + backoffMs(intentos),
+      });
       return { kind: "offline" };
     }
     await db.operaciones.update(op.id, { estado: "error", error: `${e.message} (${e.status})` });
@@ -290,6 +329,10 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
     const touched = new Set<number>();
     siteLoop: for (const [sitioId, ops] of bySite) {
       if (blockedSites.has(sitioId)) continue; // chain stays halted until the user resolves it
+      if ((ops[0]?.nextAttemptAt ?? 0) > Date.now()) {
+        outcome.offline = true; // backing off after a transient failure; try again later
+        continue;
+      }
       let etag = await resolveEtag(db, sitioId, ops[0]?.etagBase ?? "");
       for (const op of ops) {
         await db.operaciones.update(op.id, { estado: "enviando" });
@@ -349,6 +392,37 @@ export async function syncAll(deps: SyncDeps): Promise<SyncOutcome> {
   }
 }
 
+/**
+ * Drop a site that is no longer ours together with everything queued for it. Leaving the ops
+ * behind made them unreachable: blocked forever, counted in "requieren atención", with no page
+ * to resolve them from (audit FE-2). What was lost is recorded in meta for the UI.
+ */
+export async function forgetSitios(db: PipelineDb, ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  await db.transaction("rw", db.sitios, db.operaciones, db.fotos, db.meta, async () => {
+    const lost = await db.operaciones.where("sitioId").anyOf(ids).count();
+    await db.sitios.bulkDelete(ids);
+    await db.operaciones.where("sitioId").anyOf(ids).delete();
+    await db.fotos.where("sitioId").anyOf(ids).delete();
+    if (lost) {
+      const prev = (await getMeta<number>(db, META_LOST_OPS)) ?? 0;
+      await setMeta(db, META_LOST_OPS, prev + lost);
+    }
+  });
+}
+
+/**
+ * Drop the cached sites and the delta watermark so the next sync downloads everything again,
+ * keeping queued changes and photos (UX-P12: a diverged local cache had no exit but "Salir").
+ */
+export async function resetCache(db: PipelineDb): Promise<void> {
+  await db.transaction("rw", db.sitios, db.meta, async () => {
+    await db.sitios.clear();
+    await db.meta.delete(META_MAX_ROWVERSION);
+    await db.meta.delete(META_ETAG_SUCCESSORS);
+  });
+}
+
 export async function refreshSitio(deps: SyncDeps, sitioId: number): Promise<SitioDetail | null> {
   try {
     const detail = await deps.api.get<SitioDetail>(`/api/v1/sitios/${sitioId}`);
@@ -356,7 +430,7 @@ export async function refreshSitio(deps: SyncDeps, sitioId: number): Promise<Sit
     return detail;
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) {
-      await deps.db.sitios.delete(sitioId);
+      await forgetSitios(deps.db, [sitioId]);
       return null;
     }
     throw e;
@@ -377,8 +451,8 @@ export async function pullDelta(deps: SyncDeps): Promise<SitioDelta> {
     for (const item of delta.items) {
       await db.sitios.put({ id: item.id, detail: item, etag: item.etag, updatedAt: Date.now() });
     }
-    if (delta.removed_ids.length) await db.sitios.bulkDelete(delta.removed_ids);
     await db.meta.put({ key: META_MAX_ROWVERSION, value: delta.max_rowversion });
   });
+  await forgetSitios(db, delta.removed_ids);
   return delta;
 }

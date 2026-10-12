@@ -2,7 +2,7 @@ name: ade-pipeline
 
 services:
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04 # pinned; same as CI
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
@@ -19,14 +19,15 @@ services:
       start_period: 20s
 
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:latest
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0 # pinned; same as CI
     command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --skipApiVersionCheck
     ports:
       - "127.0.0.1:${AZURITE_PORT:-10000}:10000"
     volumes:
       - azuritedata:/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:10000/devstoreaccount1?comp=list >/dev/null 2>&1 || exit 0"]
+      # The listing needs auth and answers 403 once the service is up; any HTTP answer means healthy.
+      test: ["CMD-SHELL", "wget -q -S -O- http://127.0.0.1:10000/devstoreaccount1?comp=list 2>&1 | grep -q 'HTTP/'"]
       interval: 5s
       timeout: 5s
       retries: 10

@@ -11,6 +11,7 @@ param deployGatewaySubnet = true
 param authTenantId = '00000000-0000-0000-0000-000000000000'
 param authAudience = '00000000-0000-0000-0000-000000000021'
 param authAllowedAzp = '00000000-0000-0000-0000-000000000022,00000000-0000-0000-0000-000000000023'
+param authAdminAzp = '00000000-0000-0000-0000-000000000023'
 param sqlAdminGroupObjectId = '00000000-0000-0000-0000-000000000010'
 param sqlAdminGroupName = 'PIPELINE-SQL-Admins'
 param fabricWorkspaceIdentityPrincipalId = ''
@@ -36,3 +37,5 @@ param lockImmutabilityPolicy = false
 param environmentName = 'production'
 param logLevel = 'INFO'
 param appPublicUrl = 'https://pipeline-prod.azurefd.net'
+// Alert recipients (backlog OBS); empty until the support rota exists.
+param alertEmails = []

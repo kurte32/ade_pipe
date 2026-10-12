@@ -88,11 +88,11 @@ E2E_ORIGEN_RANGE = (800_000, 900_000)
 def e2e_cleanup() -> None:
     """Remove every site in the e2e id range, its child rows and blobs (audit C7).
 
-    The append-only ledger rows (auditoria, sitio_estatus_historial) stay, by design. Refuses to
-    run in production.
+    The append-only ledger rows (auditoria, sitio_estatus_historial) stay, by design. Runs only
+    against the local compose stack (audit IDN-2, INF-5).
     """
-    if get_settings().environment == "production":
-        raise SystemExit("e2e-cleanup refuses to run in production")
+    if get_settings().deployed:
+        raise SystemExit("e2e-cleanup runs only in the local environment")
     from app.core.db import system_session
     from app.core.storage import get_blob_store
 

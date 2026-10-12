@@ -155,8 +155,9 @@ def test_formula_neutralization(settings: Settings) -> None:
     assert neutralize("=SUM(A1)") == "'=SUM(A1)"
     assert neutralize("+1") == "'+1" and neutralize("@x") == "'@x" and neutralize("-5") == "'-5"
     assert neutralize("Av. Uno") == "Av. Uno" and neutralize(None) is None
+    # Stored values are the file's own; neutralisation applies to exports only (audit DAT-17).
     r = run(settings, [row(SITIO="=HYPERLINK(1)")])[0]
-    assert r.originales["SITIO"] == "'=HYPERLINK(1)"
+    assert r.originales["SITIO"] == "=HYPERLINK(1)"
     assert (r.normalizado or {})["nombre"] == "=HYPERLINK(1)"
 
 

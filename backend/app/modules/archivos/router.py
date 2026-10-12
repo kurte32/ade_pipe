@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core import idempotency
 from app.core.config import Settings, get_settings
 from app.core.errors import unprocessable
+from app.core.ratelimit import rate_limited
 from app.core.security import ROLE_ADMIN, ROLE_COORDINADOR, Claims, require_role
 from app.core.storage import BlobStore
 from app.deps import blob_store, client_ip, get_session, idempotency_key
@@ -46,6 +47,7 @@ def _uuid(value: str, what: str) -> uuid.UUID:
 def crear_subida(
     body: SubidaCreate,
     response: Response,
+    _limit: None = Depends(rate_limited("subidas", "rate_limit_uploads_per_minute")),
     claims: Claims = Depends(_coord),
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
@@ -81,6 +83,7 @@ async def subir_parte(
     subida_id: str,
     n: int,
     request: Request,
+    _limit: None = Depends(rate_limited("partes", "rate_limit_upload_parts_per_minute")),
     claims: Claims = Depends(_coord),
     session: Session = Depends(get_session),
     store: BlobStore = Depends(blob_store),
@@ -148,7 +151,9 @@ def archivo_meta(
     return service.archivo_meta(service.get_archivo(session, _uuid(archivo_id, "archivo")))
 
 
-@router.get("/archivos/{archivo_id}", response_class=StreamingResponse)
+@router.api_route(
+    "/archivos/{archivo_id}", methods=["GET", "HEAD"], response_class=StreamingResponse
+)
 def descargar_archivo(
     archivo_id: str,
     request: Request,
@@ -158,9 +163,6 @@ def descargar_archivo(
     ip: str | None = Depends(client_ip),
 ) -> Response:
     archivo = service.get_archivo(session, _uuid(archivo_id, "archivo"))
-    service.record_download(session, claims, archivo, ip)
-    # Audit row is committed before any byte leaves the server (RNF-07).
-    session.commit()
     size = archivo.bytes
     rng = v.parse_range(request.headers.get("Range"), size)
     headers = {
@@ -180,7 +182,11 @@ def descargar_archivo(
         headers["Content-Length"] = str(length)
         headers["Content-Range"] = f"bytes {start}-{end}/{size}"
     if request.method == "HEAD":
+        # Headers only: no bytes leave the server, so no download is recorded.
         return Response(status_code=code, headers=headers, media_type=archivo.content_type)
+    service.record_download(session, claims, archivo, ip)
+    # Audit row is committed before any byte leaves the server (RNF-07).
+    session.commit()
     path, content_type = archivo.ruta_blob, archivo.content_type
 
     def body() -> Iterator[bytes]:

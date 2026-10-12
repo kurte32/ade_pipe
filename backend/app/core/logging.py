@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import re
 import sys
+import time
 import uuid
 from collections.abc import MutableMapping
 from contextvars import ContextVar
@@ -51,11 +53,24 @@ def _drop_forbidden(
     return event_dict
 
 
+_REVISION = os.environ.get("CONTAINER_APP_REVISION", "")
+
+
+def _add_revision(
+    _: Any, __: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
+    # Container Apps sets CONTAINER_APP_REVISION; one field tells which revision wrote the line.
+    if _REVISION:
+        event_dict.setdefault("revision", _REVISION)
+    return event_dict
+
+
 def configure_logging(level: str = "INFO") -> None:
     logging.basicConfig(
         format="%(message)s", stream=sys.stderr, level=getattr(logging, level.upper(), logging.INFO)
     )
-    for noisy in ("azure", "urllib3", "uvicorn.access"):
+    # httpx logs every request URL at INFO: Graph lookups carry emails and oids (audit IDN-4).
+    for noisy in ("azure", "urllib3", "uvicorn.access", "httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
     structlog.configure(
         processors=[
@@ -63,6 +78,7 @@ def configure_logging(level: str = "INFO") -> None:
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             _drop_forbidden,
+            _add_revision,
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
         ],
@@ -80,6 +96,7 @@ class CorrelationMiddleware(BaseHTTPMiddleware):
         # ledger, so a client must not be able to choose it (audit A5). A client-sent value is kept
         # only as a sanitized log field so support can still match a device's own reference.
         cid = uuid.uuid4().hex
+        started = time.perf_counter()
         token = _correlation_id.set(cid)
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(
@@ -109,10 +126,14 @@ class CorrelationMiddleware(BaseHTTPMiddleware):
             _correlation_id.reset(token)
         response.headers[CORRELATION_HEADER] = cid
         claims = getattr(request.state, "claims", None)
+        # Entity ids from the route (backlog LOG-FIELDS): support can filter by site or lot.
+        fields: dict[str, object] = {
+            k: v
+            for k, v in (request.scope.get("path_params") or {}).items()
+            if k in ("sitio_id", "lote_id", "archivo_id", "subida_id")
+        }
+        fields["duration_ms"] = round((time.perf_counter() - started) * 1000)
         if claims is not None:
-            structlog.get_logger().info(
-                "request", status=response.status_code, user=hash_oid(claims.oid)
-            )
-        else:
-            structlog.get_logger().info("request", status=response.status_code)
+            fields["user"] = hash_oid(claims.oid)
+        structlog.get_logger().info("request", status=response.status_code, **fields)
         return response

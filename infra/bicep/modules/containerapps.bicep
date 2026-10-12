@@ -46,11 +46,20 @@ param databaseName string
 param authTenantId string
 param authAudience string
 param authAllowedAzp string
+@description('Client id of the admin SPA registration: Admin is honoured only from it.')
+param authAdminAzp string
+@description('Comma-separated SPA origins allowed by CORS. Empty behind Front Door (same origin); the SWA hosts when there is no Front Door (dev, audit INF-2).')
+param corsAllowedOrigins string = ''
+@description('Front Door profile id; when set the API refuses /api/* requests without a matching X-Azure-FDID (backlog A3). Empty without Front Door.')
+param frontDoorId string = ''
 param stagingBlobEndpoint string
 param documentsBlobEndpoint string
 param stagingContainer string = 'staging'
 param documentsContainer string = 'documents'
 param teamsAppId string = ''
+@description('Notification sender: graph needs the Teams app id (TEAMS_APP_ID); log keeps the in-app feed only. The guard refuses graph without an app id in any deployed environment.')
+@allowed(['graph', 'log'])
+param notifyMode string = 'graph'
 param graphBaseUrl string = 'https://graph.microsoft.com/v1.0'
 param retentionYears int = 5
 
@@ -75,6 +84,9 @@ var commonEnv = [
   { name: 'AUTH_TENANT_ID', value: authTenantId }
   { name: 'AUTH_AUDIENCE', value: authAudience }
   { name: 'AUTH_ALLOWED_AZP', value: authAllowedAzp }
+  { name: 'AUTH_ADMIN_AZP', value: authAdminAzp }
+  { name: 'CORS_ALLOWED_ORIGINS', value: corsAllowedOrigins }
+  { name: 'FRONT_DOOR_ID', value: frontDoorId }
   { name: 'AUTH_ISSUER', value: authIssuer }
   { name: 'AUTH_JWKS_URL', value: authJwksUrl }
   { name: 'STORAGE_MODE', value: 'azure' }
@@ -84,7 +96,7 @@ var commonEnv = [
   { name: 'STORAGE_DOCUMENTS_CONTAINER', value: documentsContainer }
   { name: 'SCAN_MODE', value: enableDefenderScanning ? 'defender' : 'none' }
   { name: 'TRUSTED_PROXY_HOPS', value: string(trustedProxyHops) }
-  { name: 'NOTIFY_MODE', value: 'graph' }
+  { name: 'NOTIFY_MODE', value: notifyMode }
   { name: 'DIRECTORY_MODE', value: 'graph' }
   { name: 'GRAPH_BASE_URL', value: graphBaseUrl }
   { name: 'TEAMS_APP_ID', value: teamsAppId }

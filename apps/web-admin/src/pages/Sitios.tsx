@@ -1,9 +1,10 @@
-import { ESTATUS_LABELS, EstatusBadge, ProblemAlert, Spinner, formatMexicoCity } from "@pipeline/ui";
+import { ESTATUS_LABELS, EstatusBadge, Icon, PageHeader, ProblemAlert, Spinner, formatMexicoCity, usePageTitle } from "@pipeline/ui";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { useApi } from "../api";
+import { useCoordinadores } from "../lib/equivalencias";
 import { REGIONES } from "../lib/estatus";
 import type { SitioPage } from "../lib/types";
 
@@ -26,9 +27,18 @@ function buildQuery(f: Filters, cursor?: string): string {
 }
 
 export function Sitios() {
+  usePageTitle("Sitios");
   const api = useApi();
-  const [draft, setDraft] = useState<Filters>({ region: "", estatus: "", q: "", incluirNoVigentes: false });
-  const [filters, setFilters] = useState<Filters>(draft);
+  const coords = useCoordinadores();
+  const [params] = useSearchParams();
+  const initial: Filters = { region: "", estatus: params.get("estatus") ?? "", q: "", incluirNoVigentes: false };
+  const [draft, setDraft] = useState<Filters>(initial);
+  const [filters, setFilters] = useState<Filters>(initial);
+  useEffect(() => {
+    const estatus = params.get("estatus") ?? "";
+    setDraft((d) => ({ ...d, estatus }));
+    setFilters((f) => ({ ...f, estatus }));
+  }, [params]);
 
   const q = useInfiniteQuery({
     queryKey: ["sitios", filters],
@@ -38,9 +48,16 @@ export function Sitios() {
   });
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
 
+  // Selects and the checkbox apply immediately; the text search applies with Enter or "Filtrar".
+  const applyNow = (patch: Partial<Filters>) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    setFilters(next);
+  };
+
   return (
     <main>
-      <h1>Sitios</h1>
+      <PageHeader title="Sitios" description="Todos los sitios del pipeline, de todos los coordinadores." />
       <form
         className="filters"
         onSubmit={(e) => {
@@ -50,7 +67,7 @@ export function Sitios() {
       >
         <label>
           Región
-          <select value={draft.region} onChange={(e) => setDraft({ ...draft, region: e.target.value })}>
+          <select value={draft.region} onChange={(e) => applyNow({ region: e.target.value })}>
             <option value="">Todas</option>
             {REGIONES.map((r) => (
               <option key={r}>{r}</option>
@@ -59,7 +76,7 @@ export function Sitios() {
         </label>
         <label>
           Estatus
-          <select value={draft.estatus} onChange={(e) => setDraft({ ...draft, estatus: e.target.value })}>
+          <select value={draft.estatus} onChange={(e) => applyNow({ estatus: e.target.value })}>
             <option value="">Todos</option>
             {Object.entries(ESTATUS_LABELS).map(([k, v]) => (
               <option key={k} value={k}>
@@ -75,68 +92,84 @@ export function Sitios() {
             value={draft.q}
             maxLength={100}
             data-testid="sitios-search"
+            placeholder="Calle, avenida…"
             onChange={(e) => setDraft({ ...draft, q: e.target.value })}
           />
         </label>
         <label className="check">
-          <input
-            type="checkbox"
-            checked={draft.incluirNoVigentes}
-            onChange={(e) => setDraft({ ...draft, incluirNoVigentes: e.target.checked })}
-          />{" "}
-          Incluir no vigentes
+          <input type="checkbox" checked={draft.incluirNoVigentes} onChange={(e) => applyNow({ incluirNoVigentes: e.target.checked })} /> Incluir no vigentes
         </label>
-        <button type="submit">Filtrar</button>
+        <div className="filter-actions">
+          <button type="submit" className="secondary">
+            <Icon name="search" size={16} /> Filtrar
+          </button>
+        </div>
       </form>
 
       {q.isPending ? <Spinner label="Cargando sitios" /> : null}
       {q.isError ? <ProblemAlert error={q.error} onRetry={() => void q.refetch()} /> : null}
       {q.data ? (
-        <div className="table-wrap">
-          <table data-testid="sitios-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Nombre</th>
-                <th>Región</th>
-                <th>Estatus</th>
-                <th>Coordinador</th>
-                <th>Campos</th>
-                <th>Actualizado</th>
-                <th>Revisión</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((s) => (
-                <tr key={s.id} data-testid={`sitio-row-${s.id}`}>
-                  <td>{s.origen_id}</td>
-                  <td>
-                    <Link to={`/sitios/${s.id}`}>{s.nombre}</Link>
-                    {!s.vigente ? <span className="tag">no vigente</span> : null}
-                  </td>
-                  <td>{s.region}</td>
-                  <td>
-                    <EstatusBadge estatus={s.estatus} devuelto={s.devuelto} />
-                  </td>
-                  <td data-testid="col-coordinador">{s.usuario_codigo}</td>
-                  <td>
-                    {s.campos_capturados}/{s.campos_total}
-                  </td>
-                  <td className="nowrap">{formatMexicoCity(s.actualizado_utc)}</td>
-                  <td>{s.en_revision_admin ? <span className="tag tag-advertencia">pendiente</span> : ""}</td>
+        <>
+          <div className="table-wrap">
+            <table data-testid="sitios-table" className="table-cards">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Región</th>
+                  <th scope="col">Estatus</th>
+                  <th scope="col">Coordinador</th>
+                  <th scope="col" title="Campos capturados en el archivo de origen">
+                    Campos
+                  </th>
+                  <th scope="col">Actualizado</th>
+                  <th scope="col">Revisión</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {items.length === 0 ? <p className="muted">Sin resultados.</p> : null}
-          {q.hasNextPage ? (
-            <div className="actions">
-              <button type="button" className="secondary" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
-                Cargar más
-              </button>
+              </thead>
+              <tbody>
+                {items.map((s) => (
+                  <tr key={s.id} data-testid={`sitio-row-${s.id}`} className={s.en_revision_admin ? "is-attention" : undefined}>
+                    <td className="num" data-label="#">{s.origen_id}</td>
+                    <td className="cell-name" data-label="Nombre">
+                      <Link to={`/sitios/${s.id}`}>{s.nombre}</Link>
+                      {!s.vigente ? <span className="tag tag-muted" style={{ marginLeft: 6 }}>no vigente</span> : null}
+                    </td>
+                    <td data-label="Región">{s.region}</td>
+                    <td data-label="Estatus">
+                      <EstatusBadge estatus={s.estatus} devuelto={s.devuelto} />
+                    </td>
+                    <td title={coords.nombre(s.usuario_codigo)} data-label="Coordinador">
+                      <span data-testid="col-coordinador">{s.usuario_codigo}</span>
+                      {coords.byCode[s.usuario_codigo]?.nombre ? <span className="muted"> · {coords.byCode[s.usuario_codigo]?.nombre?.split(" ")[0]}</span> : null}
+                    </td>
+                    <td className="cell-tight" data-label="Campos">
+                      <span className="campos" title={`${s.campos_capturados} de ${s.campos_total} campos con dato en el archivo`}>
+                        <span className="bar" aria-hidden="true">
+                          <i style={{ width: `${Math.round((s.campos_capturados / Math.max(1, s.campos_total)) * 100)}%` }} />
+                        </span>
+                        {s.campos_capturados}/{s.campos_total}
+                      </span>
+                    </td>
+                    <td className="nowrap" data-label="Actualizado">{formatMexicoCity(s.actualizado_utc)}</td>
+                    <td data-label="Revisión">{s.en_revision_admin ? <span className="tag tag-warning">pendiente</span> : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {items.length === 0 ? <p className="muted" style={{ padding: "var(--space-4)" }}>Sin resultados.</p> : null}
+            <div className="table-foot">
+              <span>
+                {items.length} sitio{items.length === 1 ? "" : "s"}
+                {q.hasNextPage ? " mostrados; hay más" : ""}
+              </span>
+              {q.hasNextPage ? (
+                <button type="button" className="secondary small" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
+                  {q.isFetchingNextPage ? "Cargando…" : "Cargar más"}
+                </button>
+              ) : null}
             </div>
-          ) : null}
-        </div>
+          </div>
+        </>
       ) : null}
     </main>
   );

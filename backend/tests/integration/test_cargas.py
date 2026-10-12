@@ -115,6 +115,14 @@ def _cleanup() -> Iterator[None]:
             )
         )
         s.execute(text("DELETE FROM carga_lote WHERE archivo_nombre LIKE 'carga-test%'"))
+        # the self-provisioned base lot of test_reload is re-created on every run (audit TST-3)
+        s.execute(
+            text(
+                "DELETE FROM carga_fila_staging WHERE lote_id IN "
+                "(SELECT id FROM carga_lote WHERE archivo_nombre LIKE 'carga-base-%')"
+            )
+        )
+        s.execute(text("DELETE FROM carga_lote WHERE archivo_nombre LIKE 'carga-base-%'"))
 
 
 def test_coordinator_cannot_use_admin_routes(client, coord_a_headers) -> None:  # type: ignore[no-untyped-def]
@@ -264,7 +272,7 @@ def _load_base(client, admin_headers, offset: int) -> None:  # type: ignore[no-u
 
 
 def test_reload_updates_without_touching_progress(
-    client, admin_headers, seeded_equivalencias
+    client, admin_headers, coord_a_headers, coord_b_headers, seeded_equivalencias
 ) -> None:  # type: ignore[no-untyped-def]
     # Self-provisioned in its own id range, so it passes alone and in any order (audit C4).
     _load_base(client, admin_headers, RELOAD_OFFSET)
@@ -282,6 +290,7 @@ def test_reload_updates_without_touching_progress(
         if not cursor:
             break
     target = ard_sites[0]
+    untouched = ard_sites[-1]
     with system_session() as s:
         s.execute(
             text("UPDATE sitio SET estatus = :e WHERE id = :id"),
@@ -290,6 +299,13 @@ def test_reload_updates_without_touching_progress(
 
     # reload with USUARIO changed on the advanced site, and on one prospectado site
     other = next(s for s in ard_sites[1:] if s["origen_id"] != target["origen_id"])
+    # The prospectado site already has a contact captured by ard: it must follow the site (DAT-1).
+    r = client.put(
+        f"/api/v1/sitios/{other['id']}/contacto",
+        json={"nombre": "Dueño Reasignado", "telefono": "5551112233"},
+        headers=coord_a_headers,
+    )
+    assert r.status_code == 200, r.text
     data = _shifted_xlsx(
         {target["origen_id"]: "usa", other["origen_id"]: "usa"}, offset=RELOAD_OFFSET
     )
@@ -314,6 +330,12 @@ def test_reload_updates_without_touching_progress(
     assert body["revision"] == 1
     assert body["actualizadas"] == 85
 
+    # DAT-10: a row identical to the previous load leaves the site's ETag alone, so queued
+    # offline transitions on it keep working after a national reload.
+    assert (
+        client.get(f"/api/v1/sitios/{untouched['id']}", headers=admin_headers).json()["etag"]
+        == untouched["etag"]
+    )
     adv_detail = client.get(f"/api/v1/sitios/{target['id']}", headers=admin_headers).json()
     assert adv_detail["estatus"] == ESTATUS_DUENO  # progress untouched
     assert adv_detail["usuario_codigo"] == "ard"  # not reassigned
@@ -322,6 +344,17 @@ def test_reload_updates_without_touching_progress(
     pro_detail = client.get(f"/api/v1/sitios/{other['id']}", headers=admin_headers).json()
     assert pro_detail["usuario_codigo"] == "usa"  # prospectado site reassigned
     assert pro_detail["coordinador_oid"] == seeded_equivalencias["usa"]
+    # DAT-1: the new coordinator (usa) sees the contact and can save over it; ard no longer can.
+    as_usa = client.get(f"/api/v1/sitios/{other['id']}", headers=coord_b_headers)
+    assert as_usa.status_code == 200
+    assert as_usa.json()["contacto"]["nombre"] == "Dueño Reasignado"
+    r = client.put(
+        f"/api/v1/sitios/{other['id']}/contacto",
+        json={"nombre": "Dueño Reasignado", "telefono": "5559998877"},
+        headers=coord_b_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/v1/sitios/{other['id']}", headers=coord_a_headers).status_code == 404
 
 
 def test_cancel_and_list(client, admin_headers) -> None:  # type: ignore[no-untyped-def]
@@ -377,3 +410,31 @@ def test_confirm_rejects_unknown_planned_action(  # type: ignore[no-untyped-def]
         client.post(f"/api/v1/admin/cargas/{lote_id}/cancelar", headers=admin_headers).status_code
         == 200
     )
+
+
+def test_concurrent_confirms_yield_one_success_and_409s(client, admin_headers) -> None:  # type: ignore[no-untyped-def]
+    """DAT-12: the lote is locked while confirming; losers get 409, never a 500."""
+    import threading
+
+    csv = (
+        b"#,USUARIO,REGION,SITIO,COORDENADAS,GPS,POTENCIAL,CAMPOS,FECHA\n"
+        b'990101,ard,Xalapa,Sitio concurrente A,"19.5438, -96.9102",,Alto,24/24,09/18/2026 10:00:00\n'
+        b'990102,ard,Xalapa,Sitio concurrente B,"19.6439, -96.8103",,Alto,24/24,09/18/2026 10:00:00\n'
+    )
+    r = _upload(client, admin_headers, csv, "carga-test-concurrent.csv")
+    assert r.status_code == 201, r.text
+    lote = r.json()
+    codes: list[int] = []
+    lock = threading.Lock()
+
+    def go() -> None:
+        res = client.post(f"/api/v1/admin/cargas/{lote['id']}/confirmar", headers=admin_headers)
+        with lock:
+            codes.append(res.status_code)
+
+    threads = [threading.Thread(target=go) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(codes) == [200, 409, 409], codes

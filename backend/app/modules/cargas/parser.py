@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import unicodedata
+import zipfile
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -81,7 +83,32 @@ def _build_rows(
     return ParsedFile(columns=[c for c in columns if c], rows=rows, formato="")
 
 
+_DIMENSION_RE = re.compile(rb'<dimension ref="[A-Z]+\d+:[A-Z]+(\d+)"')
+
+
+def _declared_xlsx_rows(data: bytes) -> int | None:
+    """Row count from the sheet's `<dimension>` tag, read straight from the zip (audit B-04r).
+
+    Excel and openpyxl write it; a writer that omits it returns None and the streaming count
+    applies. The tag sits in the first bytes of the sheet XML, so an oversized file is refused
+    before any shared string or cell is parsed.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            sheets = sorted(n for n in z.namelist() if n.startswith("xl/worksheets/sheet"))
+            if not sheets:
+                return None
+            with z.open(sheets[0]) as fh:
+                m = _DIMENSION_RE.search(fh.read(4096))
+    except (zipfile.BadZipFile, KeyError, OSError):
+        return None
+    return int(m.group(1)) if m else None
+
+
 def _parse_xlsx(data: bytes, max_rows: int) -> ParsedFile:
+    declared = _declared_xlsx_rows(data)
+    if declared is not None and declared - 1 > max_rows:  # row 1 is the header
+        raise _too_many_rows(max_rows)
     if not data.startswith(ZIP_MAGIC):
         raise unprocessable("El archivo no es un XLSX válido (firma incorrecta).")
     from openpyxl import load_workbook

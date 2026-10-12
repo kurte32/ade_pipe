@@ -6,7 +6,7 @@ export * from "./types";
 export { DevAuthProvider } from "./dev";
 export type { DevUser } from "./dev";
 export { MsalAuthProvider } from "./msal";
-export { loadRuntimeEnv, RUNTIME_KEYS, RUNTIME_STORE_KEY } from "./runtime";
+export { loadRuntimeEnv, RUNTIME_KEYS, RUNTIME_STORE_KEY, runtimeEnv } from "./runtime";
 
 export interface AuthEnv {
   VITE_AUTH_MODE?: string;
@@ -15,6 +15,8 @@ export interface AuthEnv {
   VITE_API_CLIENT_ID?: string;
   VITE_DEV_IDP_URL?: string;
   VITE_ALLOW_DEV_AUTH?: string;
+  /** API origin when the SPA is not served from it (no Front Door); empty means same origin. */
+  VITE_API_BASE_URL?: string;
   PROD?: boolean;
 }
 

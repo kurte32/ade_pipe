@@ -20,6 +20,7 @@ backend/.ruff_cache/
 backend/htmlcov/
 **/node_modules/
 **/dist/
+**/dist-preview/
 **/.turbo/
 e2e/test-results/
 e2e/playwright-report/

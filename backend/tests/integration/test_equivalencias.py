@@ -52,22 +52,24 @@ def test_single_put_and_validation(client, admin_headers) -> None:  # type: igno
         json={"correo": users["jal"]["email"], "activo": False},
     )
     assert r.status_code == 200 and r.json()["activo"] is False
-    r = client.put(
-        "/api/v1/admin/equivalencias/J1", headers=admin_headers, json={"correo": "a@b.c"}
-    )
-    assert r.status_code == 422
-    r = client.put(
-        "/api/v1/admin/equivalencias",
-        headers=admin_headers,
-        json=[{"usuario_codigo": "abc", "correo": "no-es-correo"}],
-    )
-    assert r.status_code == 422
-    # restore jal as active for other suites
-    client.put(
-        "/api/v1/admin/equivalencias/jal",
-        headers=admin_headers,
-        json={"correo": users["jal"]["email"], "activo": True},
-    )
+    try:
+        r = client.put(
+            "/api/v1/admin/equivalencias/J1", headers=admin_headers, json={"correo": "a@b.c"}
+        )
+        assert r.status_code == 422
+        r = client.put(
+            "/api/v1/admin/equivalencias",
+            headers=admin_headers,
+            json=[{"usuario_codigo": "abc", "correo": "no-es-correo"}],
+        )
+        assert r.status_code == 422
+    finally:
+        # restore jal as active for other suites, even when an assertion above fails (TST-3)
+        client.put(
+            "/api/v1/admin/equivalencias/jal",
+            headers=admin_headers,
+            json={"correo": users["jal"]["email"], "activo": True},
+        )
 
 
 def test_coordinator_forbidden(client, coord_a_headers) -> None:  # type: ignore[no-untyped-def]

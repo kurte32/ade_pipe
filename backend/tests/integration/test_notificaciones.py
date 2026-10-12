@@ -100,3 +100,71 @@ def test_outbox_retries_with_backoff(
             text("SELECT intentos FROM notificacion_outbox WHERE sitio_id = :s"), {"s": sid}
         ).scalar()
     assert intentos == 1
+
+
+def test_reasignar_moves_pending_notifications(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, admin_headers, two_sites
+):
+    """DAT-5: an unsent return notice follows the site; the old coordinator must not get it."""
+    from sqlalchemy import text
+
+    from app.core.db import system_session
+
+    sid = two_sites["a"]
+    _devolver(client, coord_a_headers, admin_headers, sid)
+    etag = client.get(f"/api/v1/sitios/{sid}", headers=admin_headers).headers["etag"].strip('"')
+    r = client.post(
+        f"/api/v1/admin/sitios/{sid}/reasignar",
+        json={"coordinador_oid": str(two_sites["oid_b"])},
+        headers={**admin_headers, "If-Match": f'"{etag}"'},
+    )
+    assert r.status_code == 200, r.text
+    with system_session() as s:
+        rows = s.execute(
+            text("SELECT destinatario_oid, estado FROM notificacion_outbox WHERE sitio_id = :id"),
+            {"id": sid},
+        ).all()
+    assert rows, "the return must have queued a notification"
+    for destinatario, estado in rows:
+        if estado == "pendiente":
+            assert str(destinatario).lower() == str(two_sites["oid_b"]).lower()
+    # and whatever was already sent to the previous coordinator leaves their feed with the site
+    feed = client.get("/api/v1/notificaciones", headers=coord_a_headers).json()
+    assert all(n["sitio_id"] != sid for n in feed["items"])
+
+
+def test_overlapping_outbox_runs_send_each_row_once(  # type: ignore[no-untyped-def]
+    client, coord_a_headers, admin_headers, two_sites, monkeypatch
+):
+    """DAT-7: scheduled runs can overlap; rows are claimed so a message is never sent twice."""
+    import threading
+    import time
+
+    sid = two_sites["a"]
+    _devolver(client, coord_a_headers, admin_headers, sid)
+    sends: list[dict] = []  # type: ignore[type-arg]
+    lock = threading.Lock()
+
+    class Slow:
+        def send(self, oid: str, body: dict) -> None:  # type: ignore[type-arg]
+            time.sleep(0.8)
+            with lock:
+                sends.append(body)
+
+    monkeypatch.setattr(outbox, "get_notifier", lambda: Slow())
+    threads = [threading.Thread(target=outbox.run) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    with system_session() as s:
+        rows = (
+            s.execute(
+                text("SELECT estado FROM notificacion_outbox WHERE sitio_id = :s"), {"s": sid}
+            )
+            .scalars()
+            .all()
+        )
+    assert rows == ["enviada"]
+    # other pending rows in a shared database may be sent too; this site's must go exactly once
+    assert sum(1 for b in sends if b.get("sitio_id") == sid) == 1

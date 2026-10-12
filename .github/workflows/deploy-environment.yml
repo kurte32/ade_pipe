@@ -29,6 +29,9 @@ jobs:
     timeout-minutes: 45
     environment:
       name: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash # -eo pipefail: a failed `az … | jq` fails the step (audit CI-5)
     env:
       ENV: ${{ inputs.environment }}
       RG: ${{ vars.RESOURCE_GROUP }}
@@ -54,10 +57,11 @@ jobs:
         if: ${{ inputs.source_registry != '' && inputs.source_registry != vars.ACR_NAME }}
         run: |
           SRC="${{ inputs.source_registry }}.azurecr.io/pipeline-api@${{ inputs.image_digest }}"
+          # Control-plane only: the registry in test/prod sits behind a private endpoint, so a
+          # data-plane read (az acr repository show) from a hosted runner is refused (audit INF-3).
+          # az acr import copies the manifest by digest and fails if the source digest is missing.
           az acr import --name "${{ vars.ACR_NAME }}" --source "$SRC" \
             --image "pipeline-api:${{ github.sha }}" --force
-          GOT=$(az acr repository show --name "${{ vars.ACR_NAME }}" --image "pipeline-api@${{ inputs.image_digest }}" --query digest -o tsv)
-          [ "$GOT" = "${{ inputs.image_digest }}" ] || { echo "digest mismatch after import: $GOT"; exit 1; }
           echo "imported $SRC"
 
       - name: Revision serving traffic now
@@ -145,10 +149,15 @@ jobs:
           for v in TENANT API_CLIENT PWA_CLIENT ADMIN_CLIENT; do
             [ -n "${!v}" ] || { echo "missing environment variable for $v"; exit 1; }
           done
-          jq -n --arg t "$TENANT" --arg s "$PWA_CLIENT" --arg a "$API_CLIENT" \
-            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a}' > bundles/pwa-coordinador/dist/config.json
-          jq -n --arg t "$TENANT" --arg s "$ADMIN_CLIENT" --arg a "$API_CLIENT" \
-            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a}' > bundles/web-admin/dist/config.json
+          # Behind Front Door the SPAs call /api on their own origin. Without it (dev) they call the
+          # Container App directly, so config.json carries the API origin and the API allows the SWA
+          # origins through CORS (audit INF-2).
+          API_BASE=""
+          if [ -z "${{ steps.deploy.outputs.frontDoorHostname }}" ]; then API_BASE="https://${{ steps.deploy.outputs.apiFqdn }}"; fi
+          jq -n --arg t "$TENANT" --arg s "$PWA_CLIENT" --arg a "$API_CLIENT" --arg b "$API_BASE" \
+            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a} + (if $b == "" then {} else {VITE_API_BASE_URL:$b} end)' > bundles/pwa-coordinador/dist/config.json
+          jq -n --arg t "$TENANT" --arg s "$ADMIN_CLIENT" --arg a "$API_CLIENT" --arg b "$API_BASE" \
+            '{VITE_TENANT_ID:$t, VITE_SPA_CLIENT_ID:$s, VITE_API_CLIENT_ID:$a} + (if $b == "" then {} else {VITE_API_BASE_URL:$b} end)' > bundles/web-admin/dist/config.json
 
       - name: Deploy PWA to Static Web Apps
         run: |
@@ -182,10 +191,25 @@ jobs:
           if [ -z "$HOST" ]; then HOST="${{ steps.deploy.outputs.frontDoorHostname }}"; fi
           if [ -z "$HOST" ]; then HOST="${{ steps.deploy.outputs.apiFqdn }}"; fi
           echo "host: $HOST"
+          # Placeholder identity ids would still produce a 401 (audit CI-4): the configured tenant
+          # must exist and publish OIDC metadata before the deployment counts as reachable.
+          TENANT="${{ vars.VITE_TENANT_ID }}"
+          case "$TENANT" in ""|00000000-0000-0000-0000-000000000000) echo "VITE_TENANT_ID is a placeholder"; exit 1;; esac
+          curl -fsS "https://login.microsoftonline.com/$TENANT/v2.0/.well-known/openid-configuration" >/dev/null \
+            || { echo "tenant $TENANT publishes no OIDC metadata"; exit 1; }
           for _ in $(seq 1 30); do
             CODE=$(curl -s -o /tmp/me.json -w '%{http_code}' "https://$HOST/api/v1/me" || echo 000)
             if [ "$CODE" = "401" ] && grep -q '"type"' /tmp/me.json; then
-              echo "API reachable, authentication enforced (401 Problem Details)"; exit 0
+              echo "API reachable, authentication enforced (401 Problem Details)"
+              if [ -n "${{ steps.deploy.outputs.frontDoorAdminHostname }}" ]; then
+                ADMIN="https://${{ steps.deploy.outputs.frontDoorAdminHostname }}"
+                # The admin SPA must boot on its own host: every script it references must load (INF-1).
+                curl -fsS "$ADMIN/" -o /tmp/admin.html
+                for src in $(grep -oE 'src="[^"]+\.js"' /tmp/admin.html | sed 's/src="//;s/"$//'); do
+                  curl -fsS -o /dev/null -w "%{content_type} $src\n" "$ADMIN/${src#/}" | grep -qi javascript || { echo "admin asset $src did not load"; exit 1; }
+                done
+              fi
+              exit 0
             fi
             sleep 10
           done

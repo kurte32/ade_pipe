@@ -51,6 +51,14 @@ resource server 'Microsoft.Sql/servers@2023-05-01-preview' = {
   }
 }
 
+// Without private networking (dev) the API and the migrate job reach the public endpoint from
+// Container Apps egress addresses that are not fixed, so Azure services must be allowed (INF-2).
+resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-05-01-preview' = if (!privateNetworking) {
+  parent: server
+  name: 'AllowAllWindowsAzureIps'
+  properties: { startIpAddress: '0.0.0.0', endIpAddress: '0.0.0.0' }
+}
+
 resource entraOnly 'Microsoft.Sql/servers/azureADOnlyAuthentications@2023-05-01-preview' = {
   parent: server
   name: 'Default'

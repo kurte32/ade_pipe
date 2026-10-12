@@ -10,10 +10,13 @@ param deployGatewaySubnet = true
 param authTenantId = '00000000-0000-0000-0000-000000000000'
 param authAudience = '00000000-0000-0000-0000-000000000011'
 param authAllowedAzp = '00000000-0000-0000-0000-000000000012,00000000-0000-0000-0000-000000000013'
+param authAdminAzp = '00000000-0000-0000-0000-000000000013'
 param sqlAdminGroupObjectId = '00000000-0000-0000-0000-000000000010'
 param sqlAdminGroupName = 'PIPELINE-SQL-Admins-test'
 param fabricWorkspaceIdentityPrincipalId = ''
 param teamsAppId = ''
+// No Teams app yet (backlog TEAMS): the in-app feed only. Switch to graph once teamsAppId is set.
+param notifyMode = 'log'
 
 param apiImage = 'mcr.microsoft.com/k8se/quickstart:latest' // replaced by the CI digest on deploy
 param workloadProfileType = 'D4'
@@ -35,3 +38,5 @@ param lockImmutabilityPolicy = false
 param environmentName = 'test'
 param logLevel = 'INFO'
 param appPublicUrl = 'https://pipeline-test.azurefd.net'
+// Alert recipients (backlog OBS); empty until the support rota exists.
+param alertEmails = []

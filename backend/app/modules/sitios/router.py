@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.security import ROLE_ADMIN, ROLE_COORDINADOR, Claims, require_role
-from app.deps import get_session
+from app.deps import SitioId, get_session
 from app.modules.sitios import service
 from app.modules.sitios.schemas import SitioDelta, SitioDetail, SitioPage
 
@@ -20,11 +20,24 @@ def list_sitios(
     q: str | None = Query(default=None, max_length=100),
     region: str | None = None,
     incluir_no_vigentes: bool = False,
+    en_revision_admin: bool | None = Query(
+        default=None, description="solo sitios que esperan una decisión del administrador"
+    ),
+    devuelto: bool | None = Query(default=None, description="solo sitios devueltos"),
     claims: Claims = Depends(_any_role),
     session: Session = Depends(get_session),
 ) -> SitioPage:
     return service.list_sitios(
-        session, claims, cursor, limit, estatus, q, region, incluir_no_vigentes
+        session,
+        claims,
+        cursor,
+        limit,
+        estatus,
+        q,
+        region,
+        incluir_no_vigentes,
+        en_revision_admin=en_revision_admin,
+        devuelto=devuelto,
     )
 
 
@@ -50,7 +63,7 @@ def resumen(
 
 @router.get("/{sitio_id}", response_model=SitioDetail)
 def get_sitio(
-    sitio_id: int,
+    sitio_id: SitioId,
     response: Response,
     claims: Claims = Depends(_any_role),
     session: Session = Depends(get_session),

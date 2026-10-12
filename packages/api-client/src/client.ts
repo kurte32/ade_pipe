@@ -9,6 +9,8 @@ export interface RequestOptions {
   idempotencyKey?: string;
   ifMatch?: string;
   signal?: AbortSignal;
+  /** Per-request timeout; defaults to DEFAULT_TIMEOUT_MS. A timeout surfaces as NetworkError. */
+  timeoutMs?: number;
   headers?: Record<string, string>;
   /** Send without Authorization (health endpoints). */
   anonymous?: boolean;
@@ -43,6 +45,22 @@ export function stripEtag(etag: string | null | undefined): string | undefined {
   return etag.replace(/^W\//, "").replace(/^"|"$/g, "");
 }
 
+/** No request may hang forever: a stalled fetch would otherwise freeze the sync engine (audit FE-3). */
+export const DEFAULT_TIMEOUT_MS = 30_000;
+
+function withTimeout(signal: AbortSignal | undefined, timeoutMs: number): AbortSignal | undefined {
+  if (typeof AbortSignal === "undefined" || typeof AbortSignal.timeout !== "function") return signal;
+  const timer = AbortSignal.timeout(timeoutMs);
+  if (!signal) return timer;
+  return typeof AbortSignal.any === "function" ? AbortSignal.any([signal, timer]) : signal;
+}
+
+/** A caller's own abort is rethrown; a timeout (or any other fetch failure) is a transient NetworkError. */
+function toNetworkError(e: unknown, callerSignal: AbortSignal | undefined): never {
+  if (e instanceof DOMException && e.name === "AbortError" && callerSignal?.aborted) throw e;
+  throw new NetworkError();
+}
+
 export function createApi(auth: AuthProvider, baseUrl = ""): Api {
   const base = baseUrl.replace(/\/$/, "");
 
@@ -69,10 +87,10 @@ export function createApi(auth: AuthProvider, baseUrl = ""): Api {
     }
     let res: Response;
     try {
-      res = await fetch(`${base}${path}`, { method, headers, body, signal: opts.signal });
+      const signal = withTimeout(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      res = await fetch(`${base}${path}`, { method, headers, body, signal });
     } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") throw e;
-      throw new NetworkError();
+      toNetworkError(e, opts.signal);
     }
     const correlationId = res.headers.get("x-correlation-id") ?? undefined;
     if (!res.ok) {
@@ -97,9 +115,10 @@ export function createApi(auth: AuthProvider, baseUrl = ""): Api {
     if (!opts.anonymous) headers["authorization"] = `Bearer ${await auth.getToken()}`;
     let res: Response;
     try {
-      res = await fetch(`${base}${path}`, { headers, signal: opts.signal });
-    } catch {
-      throw new NetworkError();
+      const signal = withTimeout(opts.signal, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      res = await fetch(`${base}${path}`, { headers, signal });
+    } catch (e) {
+      toNetworkError(e, opts.signal);
     }
     if (!res.ok) {
       let problem: ProblemDetails | null = null;

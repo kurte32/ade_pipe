@@ -114,16 +114,88 @@ def test_roles_missing_is_still_a_valid_token_but_no_role() -> None:
     assert c.primary_role == "Ninguno"
 
 
-def test_production_guard_refuses_dev_modes() -> None:
-    with pytest.raises(ValueError, match="Refusing to start in production"):
-        Settings(  # type: ignore[call-arg]
-            environment="production",
-            auth_tenant_id=TENANT,
-            auth_audience=AUD,
-            auth_allowed_azp=PWA,
-            auth_issuer="http://localhost:8001/x/v2.0",
-            auth_jwks_url="x",
-        )
+VALID_PRODUCTION: dict[str, Any] = {
+    "environment": "production",
+    "auth_mode": "entra",
+    "db_auth": "entra",
+    "storage_mode": "azure",
+    "scan_mode": "defender",
+    "notify_mode": "graph",
+    "directory_mode": "graph",
+    "teams_app_id": "11111111-1111-4111-8111-111111111111",
+    "auth_tenant_id": TENANT,
+    "auth_audience": AUD,
+    "auth_allowed_azp": PWA,
+    "auth_admin_azp": "44444444-4444-4444-8444-444444444444",
+    "front_door_id": "11111111-2222-4333-8444-555555555555",
+    "auth_issuer": f"https://login.microsoftonline.com/{TENANT}/v2.0",
+    "auth_jwks_url": f"https://login.microsoftonline.com/{TENANT}/discovery/v2.0/keys",
+}
+
+
+def test_production_guard_accepts_a_valid_configuration() -> None:
+    s = Settings(**VALID_PRODUCTION)  # type: ignore[arg-type]
+    assert s.deployed is True
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("auth_mode", "dev", "AUTH_MODE"),
+        ("auth_issuer", "http://localhost:8001/x/v2.0", "AUTH_ISSUER"),
+        ("auth_jwks_url", "https://attacker.example/keys", "AUTH_JWKS_URL"),
+        ("auth_tenant_id", "00000000-0000-0000-0000-000000000000", "AUTH_TENANT_ID"),
+        ("db_auth", "sql", "DB_AUTH"),
+        ("storage_mode", "azurite", "STORAGE_MODE"),
+        ("scan_mode", "none", "SCAN_MODE"),
+        ("notify_mode", "log", "NOTIFY_MODE"),
+        ("directory_mode", "dev", "DIRECTORY_MODE"),
+        ("auth_allowed_azp", "", "AUTH_ALLOWED_AZP"),
+        ("auth_admin_azp", "", "AUTH_ADMIN_AZP"),
+        ("teams_app_id", "", "TEAMS_APP_ID"),
+        ("front_door_id", "", "FRONT_DOOR_ID"),
+    ],
+)
+def test_production_guard_refuses_each_dev_setting(field: str, value: str, message: str) -> None:
+    """One rule per case, from a valid base, so a removed check is caught (audit TST-2)."""
+    with pytest.raises(ValueError, match=message):
+        Settings(**{**VALID_PRODUCTION, field: value})  # type: ignore[arg-type]
+
+
+def test_test_environment_is_deployed_but_allows_substitute_modes() -> None:
+    """UAT must use Entra, managed identity and Azure storage, but may run without Defender or
+    Graph; it must never trust any SQL certificate or accept the dev issuer (audit IDN-2)."""
+    s = Settings(
+        **{
+            **VALID_PRODUCTION,
+            "environment": "test",
+            "scan_mode": "none",
+            "notify_mode": "log",
+            "directory_mode": "dev",
+            "teams_app_id": "",
+        }
+    )  # type: ignore[arg-type]
+    assert s.deployed is True
+    from app.core.db import _odbc_url
+
+    assert "TrustServerCertificate=no" in _odbc_url(s)
+    with pytest.raises(ValueError, match="AUTH_ISSUER"):
+        Settings(
+            **{
+                **VALID_PRODUCTION,
+                "environment": "test",
+                "auth_issuer": "http://localhost:8001/x/v2.0",
+            }
+        )  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="DB_AUTH"):
+        Settings(**{**VALID_PRODUCTION, "environment": "test", "db_auth": "sql"})  # type: ignore[arg-type]
+
+
+def test_local_environment_trusts_the_compose_certificate(settings: Settings) -> None:
+    from app.core.db import _odbc_url
+
+    assert settings.deployed is False
+    assert "TrustServerCertificate=yes" in _odbc_url(settings)
 
 
 def test_unknown_role_from_token_is_dropped(settings: Settings) -> None:

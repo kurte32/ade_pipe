@@ -9,7 +9,7 @@
  */
 import type { AuthEnv } from "./index";
 
-export const RUNTIME_KEYS = ["VITE_TENANT_ID", "VITE_SPA_CLIENT_ID", "VITE_API_CLIENT_ID"] as const;
+export const RUNTIME_KEYS = ["VITE_TENANT_ID", "VITE_SPA_CLIENT_ID", "VITE_API_CLIENT_ID", "VITE_API_BASE_URL"] as const;
 type RuntimeKey = (typeof RUNTIME_KEYS)[number];
 export const RUNTIME_STORE_KEY = "pipeline.runtimeConfig";
 
@@ -63,5 +63,13 @@ export async function loadRuntimeEnv(
       /* corrupt entry: ignore */
     }
   }
-  return { ...buildEnv, ...(runtime ?? {}) };
+  loaded = { ...buildEnv, ...(runtime ?? {}) };
+  return loaded;
+}
+
+let loaded: AuthEnv | null = null;
+
+/** The environment resolved by the last loadRuntimeEnv call (build values plus config.json). */
+export function runtimeEnv(): AuthEnv | null {
+  return loaded;
 }

@@ -25,10 +25,15 @@ param authTenantId string
 param authAudience string
 @description('Comma-separated client ids of pipeline-pwa-coordinador and pipeline-web-admin')
 param authAllowedAzp string
+@description('Client id of the admin SPA registration (one of authAllowedAzp).')
+param authAdminAzp string
 param sqlAdminGroupObjectId string
 param sqlAdminGroupName string
 param fabricWorkspaceIdentityPrincipalId string = ''
 param teamsAppId string = ''
+@description('graph (Teams activity feed, needs teamsAppId) or log (in-app feed only). Production requires graph.')
+@allowed(['graph', 'log'])
+param notifyMode string = 'graph'
 
 // Compute and data sizing
 param apiImage string
@@ -48,6 +53,8 @@ param swaSku string = 'Standard'
 param swaLocation string = 'eastus2'
 param logDailyCapGb int = 1
 param logRetentionDays int = 90
+@description('Recipients of the Azure Monitor alerts (backlog OBS). Empty: no action group or alert rules.')
+param alertEmails array = []
 
 // Storage policy
 param enableDefenderScanning bool = true
@@ -79,6 +86,7 @@ module network 'modules/network.bicep' = {
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring-${env}'
   params: {
+    alertEmails: alertEmails
     location: location
     env: env
     tags: tags
@@ -99,6 +107,7 @@ module identity 'modules/identity.bicep' = {
 module keyvault 'modules/keyvault.bicep' = {
   name: 'keyvault-${env}'
   params: {
+    workspaceId: monitoring.outputs.workspaceId
     location: location
     env: env
     tags: tags
@@ -114,6 +123,7 @@ module keyvault 'modules/keyvault.bicep' = {
 module storage 'modules/storage.bicep' = {
   name: 'storage-${env}'
   params: {
+    workspaceId: monitoring.outputs.workspaceId
     location: location
     env: env
     tags: tags
@@ -177,6 +187,18 @@ module swa 'modules/staticwebapps.bicep' = {
   }
 }
 
+// Profile and endpoints first: the API needs the profile id to validate X-Azure-FDID (backlog A3),
+// the routes need the API FQDN. Splitting the module breaks the cycle.
+module frontdoorProfile 'modules/frontdoor-profile.bicep' = {
+  name: 'frontdoor-profile-${env}'
+  params: {
+    env: env
+    tags: tags
+    enabled: deployFrontDoor
+    workspaceId: monitoring.outputs.workspaceId
+  }
+}
+
 module containerapps 'modules/containerapps.bicep' = {
   name: 'containerapps-${env}'
   params: {
@@ -212,9 +234,15 @@ module containerapps 'modules/containerapps.bicep' = {
     authTenantId: authTenantId
     authAudience: authAudience
     authAllowedAzp: authAllowedAzp
+    authAdminAzp: authAdminAzp
+    corsAllowedOrigins: deployFrontDoor
+      ? ''
+      : 'https://${swa.outputs.pwaDefaultHostname},https://${swa.outputs.adminDefaultHostname}'
     stagingBlobEndpoint: storage.outputs.stagingBlobEndpoint
     documentsBlobEndpoint: storage.outputs.documentsBlobEndpoint
     teamsAppId: teamsAppId
+    notifyMode: notifyMode
+    frontDoorId: frontdoorProfile.outputs.frontDoorId
   }
 }
 
@@ -222,9 +250,11 @@ module frontdoor 'modules/frontdoor.bicep' = {
   name: 'frontdoor-${env}'
   params: {
     env: env
-    tags: tags
     location: location
     enabled: deployFrontDoor
+    profileName: frontdoorProfile.outputs.profileName
+    endpointName: frontdoorProfile.outputs.endpointName
+    adminEndpointName: frontdoorProfile.outputs.adminEndpointName
     pwaHostname: swa.outputs.pwaDefaultHostname
     adminHostname: swa.outputs.adminDefaultHostname
     apiFqdn: containerapps.outputs.apiFqdn
@@ -241,7 +271,8 @@ module fabricgateway 'modules/fabricgateway.bicep' = {
 }
 
 output apiFqdn string = containerapps.outputs.apiFqdn
-output frontDoorHostname string = frontdoor.outputs.endpointHostname
+output frontDoorHostname string = frontdoorProfile.outputs.endpointHostname
+output frontDoorAdminHostname string = frontdoorProfile.outputs.adminEndpointHostname
 output pwaHostname string = swa.outputs.pwaDefaultHostname
 output adminHostname string = swa.outputs.adminDefaultHostname
 output acrLoginServer string = acr.outputs.loginServer

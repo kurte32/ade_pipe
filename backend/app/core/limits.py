@@ -37,18 +37,27 @@ class BodyLimitMiddleware:
 
         seen = 0
         started = False
+        overflow = False
 
         async def limited_receive() -> Message:
-            nonlocal seen
+            nonlocal seen, overflow
             message = await receive()
             if message["type"] == "http.request":
                 seen += len(message.get("body", b""))
                 if seen > self.limit:
+                    overflow = True
                     raise BodyTooLargeError
             return message
 
         async def tracking_send(message: Message) -> None:
             nonlocal started
+            # A body parser may swallow BodyTooLargeError and answer 400 on its own (chunked
+            # multipart did); the overflow still wins and is reported as 413 (audit IDN-7).
+            if overflow:
+                if not started:
+                    started = True
+                    await self._reject(scope, send)
+                return
             if message["type"] == "http.response.start":
                 started = True
             await send(message)
@@ -57,6 +66,7 @@ class BodyLimitMiddleware:
             await self.app(scope, limited_receive, tracking_send)
         except BodyTooLargeError:
             if not started:
+                started = True
                 await self._reject(scope, send)
 
     async def _reject(self, scope: Scope, send: Send) -> None:

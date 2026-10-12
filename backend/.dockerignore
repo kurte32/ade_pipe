@@ -6,3 +6,7 @@ __pycache__
 .ruff_cache
 htmlcov
 .coverage
+# Not part of the runtime image (audit INF-5)
+tests/
+.env
+.env.*

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib
 import time
+import uuid
 
 import structlog
 
@@ -29,10 +30,17 @@ def run_once(name: str) -> None:
     except ModuleNotFoundError:
         log.warning("job_missing", job=name)
         return
+    # Every line of a run carries the job name and a run id (backlog LOG-FIELDS).
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(job_name=name, job_run=uuid.uuid4().hex[:12])
+    started = time.perf_counter()
     try:
         mod.run()
+        log.info("job_done", duration_ms=round((time.perf_counter() - started) * 1000))
     except Exception:  # noqa: BLE001
-        log.exception("job_failed", job=name)
+        log.exception("job_failed", duration_ms=round((time.perf_counter() - started) * 1000))
+    finally:
+        structlog.contextvars.clear_contextvars()
 
 
 def main() -> None:

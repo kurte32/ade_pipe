@@ -1,6 +1,7 @@
 # Delivery report · Pipeline de Posibles Tiendas
 
-Date: 2026-10-10. Branch: `implementation` (not pushed). Everything below was executed on the
+Date: 2026-10-10. Branch: `implementation` (merged to `main` as PR #1 on 2026-10-11; later work
+is on `prod-readiness` and `ux-redesign`, see `../CHANGELOG.md`). Everything below was executed on the
 development machine described in `IMPLEMENTATION_STATUS.md`. No Azure resources were created,
 modified or destroyed.
 
@@ -43,7 +44,7 @@ See `IMPLEMENTATION_STATUS.md` for the full table with evidence per RF, RNF and 
 | Delta watermark `MIN_ACTIVE_ROWVERSION() - 1` instead of `@@DBTS` | In-flight transactions would otherwise be skipped by the next delta | `sitios/service.py` |
 | `Sistema` role for background jobs in the RLS predicate and audit | Jobs need to see all rows and must leave an audit trail distinct from users | baseline migration, `security.py` |
 | Coordinator can only propose a discard (`en_revision_admin`), admin confirms | Terminal states are a business decision (TO_BE open question 5) | `transiciones/service.py` |
-| Admin app builds with a configurable base path (`/admin/`) | Front Door routes `/admin/*` to the admin Static Web App | `apps/web-admin/vite.config.ts` |
+| Admin app builds with a configurable base path (`/admin/`); superseded on 2026-10-11 by host-based routing (base `/`, own Front Door endpoint, audit INF-1) | Front Door routes `/admin/*` to the admin Static Web App | `apps/web-admin/vite.config.ts` |
 | Plain ARM resources instead of Azure Verified Modules | Avoids registry resolution in offline validation; no functional difference | `infra/bicep/modules` |
 | Provisional values for TDD pendientes 4, 5, 7, 8 | Needed to run end to end; all are configuration or catalog rows | migration catalogs, `.env.example` |
 

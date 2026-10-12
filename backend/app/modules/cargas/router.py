@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings, get_settings
 from app.core.errors import unprocessable
+from app.core.ratelimit import rate_limited
 from app.core.security import ROLE_ADMIN, Claims, require_role
 from app.deps import get_session
 from app.modules.cargas import service
@@ -19,6 +20,7 @@ _admin = require_role(ROLE_ADMIN)
 
 @router.post("", response_model=LoteSummary, status_code=201)
 async def crear_carga(
+    _limit: None = Depends(rate_limited("cargas", "rate_limit_loads_per_minute")),
     file: UploadFile = File(...),
     claims: Claims = Depends(_admin),
     session: Session = Depends(get_session),

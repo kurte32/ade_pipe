@@ -51,6 +51,16 @@ catalogs), then the API with hot reload and the scheduler that runs the backgrou
 | `make openapi` | Export `docs/openapi.json`; then `pnpm gen:api` regenerates the TypeScript client types |
 | `make bicep-lint` | Static validation of the Azure templates |
 
+UX screenshots of every screen at phone and desktop width (used for `docs/ux/UX_VALIDATION.md`):
+`node e2e/tools/screenshots.mjs <outDir> [label]` with the stack and `pnpm dev` running.
+
+### Network timing (RNF-08)
+
+`make e2e-preview` leaves nothing running; to measure the first list on an emulated 4G/3G network,
+start the built PWA (`cd apps/pwa-coordinador && pnpm exec vite preview --outDir dist-preview --port 4173`)
+and run `cd e2e && node tools/net-timing.mjs`. Lighthouse: `npx lighthouse http://localhost:4173/`
+with `CHROME_PATH` pointing at the Playwright Chromium.
+
 Frontend only: `pnpm --filter pwa-coordinador test`, `pnpm --filter web-admin build`, etc.
 Alternative without Node on the host: `make up-web` runs both Vite servers in containers.
 

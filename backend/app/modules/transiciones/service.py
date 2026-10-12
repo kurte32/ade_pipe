@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select, true, update
+from sqlalchemy import select, true
 from sqlalchemy.orm import Session
 
 from app.core.clock import to_utc_naive, utcnow
@@ -20,11 +20,9 @@ from app.models import (
     Estatus,
     MotivoDevolucion,
     Sitio,
-    SitioArchivo,
     SitioContacto,
     SitioEstatusHistorial,
     SitioVisita,
-    SubidaSesion,
 )
 from app.modules.auditoria import service as auditoria
 from app.modules.notificaciones import service as notificaciones
@@ -122,12 +120,25 @@ def _estatus_nombre(session: Session, codigo: str) -> str:
 # --- captures -----------------------------------------------------------------------------
 
 
+def _optional_if_match(sitio: Sitio, if_match: str | None, claims: Claims) -> None:
+    """Captures are unconditional by default (offline devices rarely hold a fresh ETag), but a
+    client that does send If-Match gets the stale-write protection it asked for (audit DAT-9)."""
+    if if_match is not None:
+        _require_if_match(sitio, if_match, claims)
+
+
 def upsert_contacto(
-    session: Session, claims: Claims, sitio_id: int, data: ContactoIn, ip: str | None
+    session: Session,
+    claims: Claims,
+    sitio_id: int,
+    data: ContactoIn,
+    ip: str | None,
+    if_match: str | None = None,
 ) -> ContactoResponse:
     sitio = sitios.get_sitio(session, sitio_id)
     if sitio.estatus not in ESTATUS_ORDER:
         raise unprocessable("El sitio está en un estatus terminal")
+    _optional_if_match(sitio, if_match, claims)
     now = _now()
     c = sitio.contacto
     if c is None:
@@ -164,11 +175,17 @@ def upsert_contacto(
 
 
 def upsert_visita(
-    session: Session, claims: Claims, sitio_id: int, data: VisitaIn, ip: str | None
+    session: Session,
+    claims: Claims,
+    sitio_id: int,
+    data: VisitaIn,
+    ip: str | None,
+    if_match: str | None = None,
 ) -> VisitaResponse:
     sitio = sitios.get_sitio(session, sitio_id)
     if sitio.estatus not in ESTATUS_ORDER:
         raise unprocessable("El sitio está en un estatus terminal")
+    _optional_if_match(sitio, if_match, claims)
     now = _now()
     fecha = to_utc_naive(data.fecha_visita_utc) if data.fecha_visita_utc else now
     v = sitio.visita
@@ -223,6 +240,9 @@ def avanzar(
     destino = data.estatus_destino
 
     if destino == ESTATUS_DESCARTADO:
+        if sitio.estatus not in ESTATUS_ORDER:
+            # A proposal on a terminal site would park it in admin review forever (audit DAT-6).
+            raise unprocessable("El sitio está en un estatus terminal")
         if not (data.comentario or "").strip():
             raise unprocessable("Indica el motivo para proponer el descarte")
         _require_if_match(sitio, if_match, claims)
@@ -237,6 +257,14 @@ def avanzar(
 
     if destino not in ESTATUS_ORDER:
         raise unprocessable("Estatus destino no permitido para el coordinador")
+    # Hold the row for the whole check-and-write, and re-read it under the lock BEFORE the
+    # precondition: a request that waited on the lock must see the writer's new version and get
+    # 412, and a concurrent document delete cannot slip between the check and the commit
+    # (audit DAT-2, TST-4). with_for_update() renders nothing on SQL Server; the hint is the lock.
+    session.execute(
+        select(Sitio).where(Sitio.id == sitio.id).with_hint(Sitio, "WITH (UPDLOCK, ROWLOCK)")
+    ).scalar_one()
+    session.refresh(sitio)
     _require_if_match(sitio, if_match, claims)
     siguiente = rules.next_estatus(sitio.estatus)
     if siguiente is None:
@@ -407,16 +435,15 @@ def reasignar(
             CoordinadorEquivalencia.oid == nuevo, CoordinadorEquivalencia.activo == true()
         )
     ).scalar_one_or_none()
-    sitio.coordinador_oid = nuevo
-    if equiv is not None:
-        sitio.usuario_codigo = equiv.usuario_codigo
+    if equiv is None:
+        # Assigning an oid nobody maps to would make the site invisible to every coordinator and
+        # leave usuario_codigo stale, so the next bulk load could never repair it (audit DAT-4).
+        raise unprocessable("El coordinador destino no tiene una equivalencia activa")
+    sitios.cambiar_propietario(session, sitio, nuevo)
+    sitio.usuario_codigo = equiv.usuario_codigo
     sitio.en_revision_admin = False
     sitio.revision_detalle = None
     _touch(sitio)
-    for model in (SitioContacto, SitioVisita, SitioArchivo, SubidaSesion):
-        session.execute(
-            update(model).where(model.sitio_id == sitio.id).values(coordinador_oid=nuevo)
-        )
     _history(
         session,
         sitio,
