@@ -64,6 +64,10 @@ Fixed, with regression tests, everything the audit rated P1 and P2 that does not
   CORS and `VITE_API_BASE_URL`; SQL firewall and NSG rules for dev; control-plane digest
   promotion; diagnostics for Front Door, Key Vault and storage; pinned base images; drift and
   smoke-test parameters; prod after test; release tags promote the `main` digest; gitleaks allowlist.
+- Root `README.md` rewritten as the entry point: what the system does, architecture at a glance,
+  stack, quick start with the local URLs, every command, the quality gates and their last results,
+  environments, the deployment flow, repository map, documentation by role, conventions and what is
+  still open. `architecture/README.md` no longer says that no code exists.
 
 ### Changed
 - Both apps redesigned to the Tiendas 3B brand with a shared design system in `packages/ui`
